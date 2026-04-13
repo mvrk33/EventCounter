@@ -12,7 +12,7 @@ import android.view.View
 import android.widget.RemoteViews
 import es.antonborri.home_widget.HomeWidgetPlugin
 
-class DayMarkWidgetProvider : AppWidgetProvider() {
+class EventCounterWidgetProvider : AppWidgetProvider() {
 
     override fun onUpdate(
         context: Context,

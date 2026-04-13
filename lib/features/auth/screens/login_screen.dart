@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/auth_service.dart';
+import '../../../core/constants.dart';
 import '../screens/restore_data_screen.dart';
 
 class LoginScreen extends ConsumerWidget {
@@ -15,8 +16,7 @@ class LoginScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final AuthService authService = ref.read(authServiceProvider);
     final scheme = Theme.of(context).colorScheme;
-    final bool supportsAppleSignIn =
-        !kIsWeb &&
+    final bool supportsAppleSignIn = !kIsWeb &&
         (defaultTargetPlatform == TargetPlatform.iOS ||
             defaultTargetPlatform == TargetPlatform.macOS);
 
@@ -43,7 +43,7 @@ class LoginScreen extends ConsumerWidget {
                 const Spacer(flex: 3),
                 // App icon
                 Center(
-                    child: Container(
+                  child: Container(
                     width: 96,
                     height: 96,
                     decoration: BoxDecoration(
@@ -55,13 +55,18 @@ class LoginScreen extends ConsumerWidget {
                       ),
                     ),
                     child: const Center(
-                      child: Text('📅', style: TextStyle(fontSize: 44)),
+                      child: Padding(
+                        padding: EdgeInsets.all(20),
+                        child: Image(
+                          image: AssetImage(AppConstants.logoAssetPath),
+                        ),
+                      ),
                     ),
                   ),
                 ),
                 const SizedBox(height: 24),
                 Text(
-                  'DayMark',
+                  AppConstants.appName,
                   style: GoogleFonts.nunito(
                     fontSize: 46,
                     fontWeight: FontWeight.w800,
@@ -107,7 +112,8 @@ class LoginScreen extends ConsumerWidget {
                         icon: Icons.g_mobiledata_rounded,
                         onPressed: () async {
                           try {
-                            final credential = await authService.signInWithGoogle();
+                            final credential =
+                                await authService.signInWithGoogle();
                             if (credential == null) {
                               return;
                             }
@@ -122,7 +128,8 @@ class LoginScreen extends ConsumerWidget {
                           } catch (e) {
                             if (context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Google sign-in failed: $e')),
+                                SnackBar(
+                                    content: Text('Google sign-in failed: $e')),
                               );
                             }
                           }
@@ -135,7 +142,8 @@ class LoginScreen extends ConsumerWidget {
                           icon: Icons.apple_rounded,
                           onPressed: () async {
                             try {
-                              final credential = await authService.signInWithApple();
+                              final credential =
+                                  await authService.signInWithApple();
                               if (credential == null) {
                                 return;
                               }
@@ -150,7 +158,9 @@ class LoginScreen extends ConsumerWidget {
                             } catch (e) {
                               if (context.mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('Apple sign-in failed: $e')),
+                                  SnackBar(
+                                      content:
+                                          Text('Apple sign-in failed: $e')),
                                 );
                               }
                             }
@@ -245,7 +255,8 @@ class LoginScreen extends ConsumerWidget {
     }
 
     try {
-      await authService.signInWithEmailPassword(email: email, password: password);
+      await authService.signInWithEmailPassword(
+          email: email, password: password);
       if (!context.mounted) {
         return;
       }
@@ -260,7 +271,8 @@ class LoginScreen extends ConsumerWidget {
     } on FirebaseAuthException catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Email sign-in failed: ${e.message ?? e.code}')),
+          SnackBar(
+              content: Text('Email sign-in failed: ${e.message ?? e.code}')),
         );
       }
     } catch (e) {
@@ -295,14 +307,16 @@ class _AuthButton extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 13),
           child: Text(
             label,
-            style: GoogleFonts.nunito(fontSize: 15, fontWeight: FontWeight.w700),
+            style:
+                GoogleFonts.nunito(fontSize: 15, fontWeight: FontWeight.w700),
           ),
         ),
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.white,
           foregroundColor: const Color(0xFF5E6AD2),
           elevation: 0,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         ),
       ),
     );

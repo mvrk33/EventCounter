@@ -1,8 +1,8 @@
-# Material 3 (Material U) Implementation Summary for DayMark
+# Material 3 (Material U) Implementation Summary for EventCounter
 
 ## ✨ What Was Implemented
 
-Your DayMark Flutter app has been fully enhanced with **Material 3 (Material U)** design system - Google's latest and most modern design language.
+Your EventCounter Flutter app has been fully enhanced with **Material 3 (Material U)** design system - Google's latest and most modern design language.
 
 ## 📦 What You Get
 
@@ -219,7 +219,7 @@ Before considering implementation complete:
 
 ## 🎊 You're All Set!
 
-Your DayMark app now has a beautiful, modern Material 3 UI/UX! 
+Your EventCounter app now has a beautiful, modern Material 3 UI/UX! 
 
 **Start applying it to your screens using the quick reference guide and examples provided. Your app will look professional, modern, and feel like a premium Google experience.**
 

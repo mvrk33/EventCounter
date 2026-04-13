@@ -45,5 +45,5 @@ Future<void> main() async {
   final NotificationService notifications = NotificationService();
   await notifications.initialize();
 
-  runApp(const ProviderScope(child: DayMarkApp()));
+  runApp(const ProviderScope(child: EventCounterApp()));
 }

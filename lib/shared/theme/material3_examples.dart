@@ -1,5 +1,5 @@
 // Material 3 Widget Examples
-// This file demonstrates how to use Material 3 components in DayMark
+// This file demonstrates how to use Material 3 components in Event Counter
 
 import 'package:flutter/material.dart';
 import 'material3_constants.dart';

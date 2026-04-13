@@ -1,6 +1,6 @@
 # Material 3 Implementation Complete ✅
 
-## Project: DayMark Flutter App
+## Project: EventCounter Flutter App
 ## Date: April 11, 2026
 ## Status: IMPLEMENTATION COMPLETE & READY TO USE
 
@@ -238,7 +238,7 @@ FilledButton(
 ## 📁 File Structure
 
 ```
-DayMark/
+EventCounter/
 ├── 📄 MATERIAL3_README.md                      ← Start here
 ├── 📄 MATERIAL3_SUMMARY.md                     
 ├── 📄 MATERIAL3_QUICK_REFERENCE.md             ← Developer handbook
@@ -316,7 +316,7 @@ DayMark/
 
 ## 🎊 Summary
 
-Your DayMark app now has:
+Your EventCounter app now has:
 - ✨ **Beautiful Material 3 design system**
 - 📚 **Comprehensive documentation** (25+ pages)
 - 💻 **600+ lines of production code**
@@ -346,5 +346,5 @@ Your DayMark app now has:
 **Material Design**: Material 3
 **Status**: ✅ COMPLETE
 
-Your DayMark app is now powered by Google's latest design system! 🎉
+Your EventCounter app is now powered by Google's latest design system! 🎉
 

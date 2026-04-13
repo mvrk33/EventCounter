@@ -17,17 +17,17 @@ class WidgetConfigScreen extends ConsumerStatefulWidget {
 
 class _WidgetConfigScreenState extends ConsumerState<WidgetConfigScreen> {
   static const MethodChannel _widgetChannel =
-      MethodChannel('daymark/widget_actions');
+      MethodChannel('event_counter/widget_actions');
 
   // Config state
-  String _eventMode  = 'nearest';
-  bool   _transparent = false;
-  Color  _bgColor    = const Color(0xCC5E6AD2);
-  Color  _textColor  = Colors.white;
-  bool   _showEmoji  = true;
-  bool   _showTitle  = true;
-  String _countUnit  = 'days';
-  bool   _loading    = true;
+  String _eventMode = 'nearest';
+  bool _transparent = false;
+  Color _bgColor = const Color(0xCC5E6AD2);
+  Color _textColor = Colors.white;
+  bool _showEmoji = true;
+  bool _showTitle = true;
+  String _countUnit = 'days';
+  bool _loading = true;
 
   @override
   void initState() {
@@ -37,23 +37,36 @@ class _WidgetConfigScreenState extends ConsumerState<WidgetConfigScreen> {
 
   Future<void> _loadConfig() async {
     try {
-      _eventMode  = await HomeWidget.getWidgetData<String>(WidgetKeys.cfgEventMode)   ?? 'nearest';
-      _transparent= await HomeWidget.getWidgetData<bool>  (WidgetKeys.cfgTransparent) ?? false;
-      _showEmoji  = await HomeWidget.getWidgetData<bool>  (WidgetKeys.cfgShowEmoji)   ?? true;
-      _showTitle  = await HomeWidget.getWidgetData<bool>  (WidgetKeys.cfgShowTitle)   ?? true;
-      _countUnit  = await HomeWidget.getWidgetData<String>(WidgetKeys.cfgCountUnit)   ?? 'days';
-      final String bgHex  = await HomeWidget.getWidgetData<String>(WidgetKeys.cfgBgColor)    ?? '#CC5E6AD2';
-      final String txtHex = await HomeWidget.getWidgetData<String>(WidgetKeys.cfgTextColor)  ?? '#FFFFFFFF';
-      _bgColor   = _hexToColor(bgHex);
+      _eventMode =
+          await HomeWidget.getWidgetData<String>(WidgetKeys.cfgEventMode) ??
+              'nearest';
+      _transparent =
+          await HomeWidget.getWidgetData<bool>(WidgetKeys.cfgTransparent) ??
+              false;
+      _showEmoji =
+          await HomeWidget.getWidgetData<bool>(WidgetKeys.cfgShowEmoji) ?? true;
+      _showTitle =
+          await HomeWidget.getWidgetData<bool>(WidgetKeys.cfgShowTitle) ?? true;
+      _countUnit =
+          await HomeWidget.getWidgetData<String>(WidgetKeys.cfgCountUnit) ??
+              'days';
+      final String bgHex =
+          await HomeWidget.getWidgetData<String>(WidgetKeys.cfgBgColor) ??
+              '#CC5E6AD2';
+      final String txtHex =
+          await HomeWidget.getWidgetData<String>(WidgetKeys.cfgTextColor) ??
+              '#FFFFFFFF';
+      _bgColor = _hexToColor(bgHex);
       _textColor = _hexToColor(txtHex);
-    } catch (_) { /**/ }
+    } catch (_) {/**/}
     if (mounted) setState(() => _loading = false);
   }
 
   Color _hexToColor(String hex) {
     try {
       final String clean = hex.replaceAll('#', '');
-      return Color(int.parse(clean.length == 6 ? 'FF$clean' : clean, radix: 16));
+      return Color(
+          int.parse(clean.length == 6 ? 'FF$clean' : clean, radix: 16));
     } catch (_) {
       return const Color(0xFF5E6AD2);
     }
@@ -64,13 +77,18 @@ class _WidgetConfigScreenState extends ConsumerState<WidgetConfigScreen> {
   }
 
   Future<void> _applyAndUpdate() async {
-    await HomeWidget.saveWidgetData<String>(WidgetKeys.cfgEventMode,   _eventMode);
-    await HomeWidget.saveWidgetData<bool>  (WidgetKeys.cfgTransparent, _transparent);
-    await HomeWidget.saveWidgetData<String>(WidgetKeys.cfgBgColor,     _colorToHex(_bgColor));
-    await HomeWidget.saveWidgetData<String>(WidgetKeys.cfgTextColor,   _colorToHex(_textColor));
-    await HomeWidget.saveWidgetData<bool>  (WidgetKeys.cfgShowEmoji,   _showEmoji);
-    await HomeWidget.saveWidgetData<bool>  (WidgetKeys.cfgShowTitle,   _showTitle);
-    await HomeWidget.saveWidgetData<String>(WidgetKeys.cfgCountUnit,   _countUnit);
+    await HomeWidget.saveWidgetData<String>(
+        WidgetKeys.cfgEventMode, _eventMode);
+    await HomeWidget.saveWidgetData<bool>(
+        WidgetKeys.cfgTransparent, _transparent);
+    await HomeWidget.saveWidgetData<String>(
+        WidgetKeys.cfgBgColor, _colorToHex(_bgColor));
+    await HomeWidget.saveWidgetData<String>(
+        WidgetKeys.cfgTextColor, _colorToHex(_textColor));
+    await HomeWidget.saveWidgetData<bool>(WidgetKeys.cfgShowEmoji, _showEmoji);
+    await HomeWidget.saveWidgetData<bool>(WidgetKeys.cfgShowTitle, _showTitle);
+    await HomeWidget.saveWidgetData<String>(
+        WidgetKeys.cfgCountUnit, _countUnit);
 
     // Re-push widget data with new config
     final events = ref.read(eventsProvider);
@@ -78,7 +96,8 @@ class _WidgetConfigScreenState extends ConsumerState<WidgetConfigScreen> {
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Widget updated! Add it from your launcher.')),
+        const SnackBar(
+            content: Text('Widget updated! Add it from your launcher.')),
       );
     }
   }
@@ -101,7 +120,8 @@ class _WidgetConfigScreenState extends ConsumerState<WidgetConfigScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Could not pin widget directly. Add it from your launcher widgets list.'),
+          content: Text(
+              'Could not pin widget directly. Add it from your launcher widgets list.'),
         ),
       );
     }
@@ -177,7 +197,9 @@ class _WidgetConfigScreenState extends ConsumerState<WidgetConfigScreen> {
                         duration: const Duration(milliseconds: 170),
                         padding: const EdgeInsets.symmetric(vertical: 10),
                         decoration: BoxDecoration(
-                          color: sel ? scheme.primary : scheme.surfaceContainerHighest,
+                          color: sel
+                              ? scheme.primary
+                              : scheme.surfaceContainerHighest,
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(
                             color: sel ? scheme.primary : scheme.outlineVariant,
@@ -190,7 +212,9 @@ class _WidgetConfigScreenState extends ConsumerState<WidgetConfigScreen> {
                           style: GoogleFonts.nunito(
                             fontSize: 13,
                             fontWeight: FontWeight.w700,
-                            color: sel ? Colors.white : scheme.onSurface.withValues(alpha: 0.7),
+                            color: sel
+                                ? Colors.white
+                                : scheme.onSurface.withValues(alpha: 0.7),
                           ),
                         ),
                       ),
@@ -250,8 +274,7 @@ class _WidgetConfigScreenState extends ConsumerState<WidgetConfigScreen> {
                     child: Row(
                       children: <Widget>[
                         _IconBox(
-                            icon: Icons.palette_rounded,
-                            color: scheme.primary),
+                            icon: Icons.palette_rounded, color: scheme.primary),
                         const SizedBox(width: 12),
                         const Expanded(
                           child: Text('Background colour'),
@@ -287,8 +310,7 @@ class _WidgetConfigScreenState extends ConsumerState<WidgetConfigScreen> {
           const SizedBox(height: 8),
           _Card(
             child: Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               child: Row(
                 children: <Widget>[
                   _IconBox(
@@ -358,7 +380,7 @@ class _WidgetConfigScreenState extends ConsumerState<WidgetConfigScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
             if (_showEmoji)
-              Text('📅',
+              Text('🗓️',
                   style: TextStyle(
                       fontSize: 36,
                       color: _transparent ? scheme.onSurface : _textColor)),
@@ -381,7 +403,8 @@ class _WidgetConfigScreenState extends ConsumerState<WidgetConfigScreen> {
             ),
             if (_showTitle)
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                 child: Text(
                   'My Birthday',
                   style: GoogleFonts.nunito(
@@ -451,7 +474,8 @@ class _Divider extends StatelessWidget {
   Widget build(BuildContext context) => Divider(
         height: 1,
         indent: 58,
-        color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.4),
+        color:
+            Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.4),
       );
 }
 
@@ -486,8 +510,7 @@ class _OptionTile extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  Text(title,
-                      style: Theme.of(context).textTheme.titleSmall),
+                  Text(title, style: Theme.of(context).textTheme.titleSmall),
                   if (subtitle != null)
                     Text(subtitle!,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -497,8 +520,7 @@ class _OptionTile extends StatelessWidget {
               ),
             ),
             if (selected)
-              Icon(Icons.check_circle_rounded,
-                  color: scheme.primary, size: 20)
+              Icon(Icons.check_circle_rounded, color: scheme.primary, size: 20)
             else
               Icon(Icons.circle_outlined,
                   color: scheme.outlineVariant, size: 20),
@@ -538,8 +560,7 @@ class _SwitchTile extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Text(title,
-                    style: Theme.of(context).textTheme.titleSmall),
+                Text(title, style: Theme.of(context).textTheme.titleSmall),
                 if (subtitle != null)
                   Text(subtitle!,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(

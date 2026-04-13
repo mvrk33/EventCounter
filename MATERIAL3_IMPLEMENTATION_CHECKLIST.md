@@ -1,4 +1,4 @@
-# Material 3 Implementation Checklist for DayMark
+# Material 3 Implementation Checklist for EventCounter
 
 ## ✅ Completed Implementation
 

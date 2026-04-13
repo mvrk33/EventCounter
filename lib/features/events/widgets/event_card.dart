@@ -24,8 +24,7 @@ class EventCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final int value = DateHelpers.eventCountValue(event);
-    final String unit = DateHelpers.unitLabel(event.countUnit, value);
+    final String countText = DateHelpers.eventCountCompactDescription(event);
 
     return Card(
       child: ListTile(
@@ -35,12 +34,13 @@ class EventCard extends StatelessWidget {
           child: Text(event.emoji),
         ),
         title: Text(event.title),
-        subtitle: Text('${DateFormat.yMMMd().format(event.date)} • ${event.category}'),
+        subtitle: Text(
+            '${DateFormat.yMMMd().format(event.date)} • ${event.category}'),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
             Text(
-              event.mode == EventMode.countdown ? '$value $unit left' : '$value $unit since',
+              countText,
               style: Theme.of(context).textTheme.titleMedium,
             ),
             IconButton(
@@ -84,7 +84,8 @@ class EventCard extends StatelessWidget {
                   value: 'delete',
                   child: Row(
                     children: <Widget>[
-                      const Icon(Icons.delete_outline_rounded, size: 16, color: Colors.red),
+                      const Icon(Icons.delete_outline_rounded,
+                          size: 16, color: Colors.red),
                       const SizedBox(width: 12),
                       const Text('Delete', style: TextStyle(color: Colors.red)),
                     ],

@@ -1,11 +1,11 @@
 {
-    "name": "daymark",
-    "short_name": "daymark",
+    "name": "Event Counter",
+    "short_name": "Event Counter",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#1E2A78",
+    "theme_color": "#5E6AD2",
+    "description": "Event Counter app.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

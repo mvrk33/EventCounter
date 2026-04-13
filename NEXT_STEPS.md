@@ -1,4 +1,4 @@
-# 🎯 Next Steps - Action Items for DayMark
+# 🎯 Next Steps - Action Items for EventCounter
 
 **Status:** Ready to Execute  
 **Priority Level:** Ordered by importance
@@ -45,7 +45,7 @@ flutter analyze
 
 **Steps:**
 1. Go to https://console.firebase.google.com
-2. Create new project "DayMark"
+2. Create new project "EventCounter"
 3. Add Android app:
    - Package: com.daymark.app
    - Download google-services.json
@@ -181,9 +181,9 @@ flutter build appbundle --release
 
 ```bash
 flutter build ios --release
-open build/ios/ipa/DayMark.ipa
+open build/ios/ipa/EventCounter.ipa
 ```
-**Output:** `build/ios/ipa/DayMark.ipa`
+**Output:** `build/ios/ipa/EventCounter.ipa`
 
 ---
 
@@ -195,7 +195,7 @@ open build/ios/ipa/DayMark.ipa
 **Steps:**
 1. Go to https://play.google.com/console
 2. Create developer account ($25 one-time)
-3. Create new app "DayMark"
+3. Create new app "EventCounter"
 4. Fill in app details:
    - App name
    - Description
@@ -214,7 +214,7 @@ open build/ios/ipa/DayMark.ipa
 1. Go to https://appstoreconnect.apple.com
 2. Create new app
 3. Fill in app details:
-   - Name: DayMark
+   - Name: EventCounter
    - Primary category
    - Description
    - Keywords
@@ -252,7 +252,7 @@ open build/ios/ipa/DayMark.ipa
 
 **Or via command line:**
 ```bash
-xcrun altool --upload-app -f build/ios/ipa/DayMark.ipa -t ios -u <apple_id> -p <app_specific_password>
+xcrun altool --upload-app -f build/ios/ipa/EventCounter.ipa -t ios -u <apple_id> -p <app_specific_password>
 ```
 
 **Expected Timeline:** 24-48 hours for review
@@ -305,7 +305,7 @@ xcrun altool --upload-app -f build/ios/ipa/DayMark.ipa -t ios -u <apple_id> -p <
 Before submitting to stores, verify:
 
 ### App Content
-- [ ] App name: "DayMark"
+- [ ] App name: "EventCounter"
 - [ ] Description accurate
 - [ ] Screenshots look good
 - [ ] Icon is 512x512+ (PNG)
@@ -502,7 +502,7 @@ Before you start:
 
 ---
 
-**You're all set! Follow these steps and your DayMark app will be live soon! 🚀**
+**You're all set! Follow these steps and your EventCounter app will be live soon! 🚀**
 
 *Last Updated: April 11, 2026*
 

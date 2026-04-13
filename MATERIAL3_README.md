@@ -1,8 +1,8 @@
-# Material 3 (Material U) Implementation for DayMark
+# Material 3 (Material U) Implementation for EventCounter
 
 ## ✨ Welcome!
 
-Your DayMark Flutter app is now powered by **Material 3** - Google's latest and most beautiful design system!
+Your EventCounter Flutter app is now powered by **Material 3** - Google's latest and most beautiful design system!
 
 ---
 
@@ -355,7 +355,7 @@ A: See [MATERIAL3_DOCUMENTATION_INDEX.md](MATERIAL3_DOCUMENTATION_INDEX.md)
 
 ## 🎊 You're Ready!
 
-Your DayMark app now has a beautiful Material 3 design system. Start using it in your screens today!
+Your EventCounter app now has a beautiful Material 3 design system. Start using it in your screens today!
 
 **Next action**: Read [MATERIAL3_QUICK_REFERENCE.md](MATERIAL3_QUICK_REFERENCE.md) and start coding! 🚀
 

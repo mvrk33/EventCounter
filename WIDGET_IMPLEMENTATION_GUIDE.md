@@ -264,7 +264,7 @@ This receives the `pinWidget` call from Flutter and uses Android's AppWidgetMana
 
 ### To Add an Event as a Widget:
 
-1. **Open the event list** in Daymark
+1. **Open the event list** in EventCounter
 2. **Tap the three-dot menu** on an event card
 3. **Select "Add to Home"** 
 4. **Customize the widget appearance:**

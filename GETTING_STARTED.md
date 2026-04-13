@@ -1,8 +1,8 @@
-# DayMark - Complete & Fixed ✅
+# EventCounter - Complete & Fixed ✅
 
 ## What Was Done
 
-Your DayMark Flutter application is **complete and production-ready**. I have verified and fixed all issues:
+Your EventCounter Flutter application is **complete and production-ready**. I have verified and fixed all issues:
 
 ### Issues Fixed
 1. **Code Quality** - Fixed 19 code analysis issues:
@@ -70,11 +70,11 @@ flutter analyze
 ## Project Structure (Complete)
 
 ```
-DayMark/
+EventCounter/
 ├── lib/
 │   ├── main.dart                  # App entry point with Hive init
 │   ├── app/
-│   │   ├── app.dart              # DayMarkApp with Riverpod + routing
+│   │   ├── app.dart              # EventCounterApp with Riverpod + routing
 │   │   └── router.dart           # GoRouter configuration
 │   ├── core/
 │   │   ├── auth_service.dart     # Firebase Auth + Google/Apple Sign-In
@@ -196,7 +196,7 @@ DayMark/
 For actual cloud sync, you need real Firebase credentials:
 
 1. Go to https://console.firebase.google.com
-2. Create a new project: "DayMark"
+2. Create a new project: "EventCounter"
 3. Add Android app:
    - Download `google-services.json`
    - Place in `android/app/`
@@ -336,7 +336,7 @@ For issues:
 
 ---
 
-**Your DayMark app is ready! 🎉**
+**Your EventCounter app is ready! 🎉**
 
 The project is fully functional, well-architected, and ready for:
 - ✅ Local development

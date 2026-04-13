@@ -20,7 +20,7 @@ class _EventDetailModalState extends ConsumerState<EventDetailModal> {
   Widget build(BuildContext context) {
     final EventModel event = _resolvedEvent();
     final int value = DateHelpers.eventCountValue(event);
-    final String unit = DateHelpers.unitLabel(event.countUnit, value);
+    final String countPhrase = DateHelpers.eventCountPhrase(event);
     final bool isCountdown = event.mode == EventMode.countdown;
     final Color accentColor = Color(event.color);
     final scheme = Theme.of(context).colorScheme;
@@ -61,15 +61,20 @@ class _EventDetailModalState extends ConsumerState<EventDetailModal> {
                   const Spacer(),
                   IconButton(
                     icon: Icon(
-                      event.isPinned ? Icons.push_pin_rounded : Icons.push_pin_outlined,
+                      event.isPinned
+                          ? Icons.push_pin_rounded
+                          : Icons.push_pin_outlined,
                       color: event.isPinned ? accentColor : null,
                     ),
                     tooltip: event.isPinned ? 'Unpin' : 'Pin to top',
                     onPressed: () async {
                       final messenger = ScaffoldMessenger.of(context);
-                      await ref.read(eventsProvider.notifier).togglePinned(event);
+                      await ref
+                          .read(eventsProvider.notifier)
+                          .togglePinned(event);
                       messenger.showSnackBar(SnackBar(
-                        content: Text(event.isPinned ? 'Removed from pinned' : 'Pinned!'),
+                        content: Text(
+                            event.isPinned ? 'Removed from pinned' : 'Pinned!'),
                       ));
                     },
                   ),
@@ -129,15 +134,14 @@ class _EventDetailModalState extends ConsumerState<EventDetailModal> {
                                       width: 56,
                                       height: 56,
                                       decoration: BoxDecoration(
-                                        color:
-                                            Colors.white.withValues(alpha: 0.18),
+                                        color: Colors.white
+                                            .withValues(alpha: 0.18),
                                         borderRadius: BorderRadius.circular(16),
                                       ),
                                       child: Center(
                                         child: Text(
                                           event.emoji,
-                                          style:
-                                              const TextStyle(fontSize: 30),
+                                          style: const TextStyle(fontSize: 30),
                                         ),
                                       ),
                                     ),
@@ -149,8 +153,7 @@ class _EventDetailModalState extends ConsumerState<EventDetailModal> {
                                       decoration: BoxDecoration(
                                         color: Colors.white
                                             .withValues(alpha: 0.20),
-                                        borderRadius:
-                                            BorderRadius.circular(20),
+                                        borderRadius: BorderRadius.circular(20),
                                       ),
                                       child: Text(
                                         event.category,
@@ -204,14 +207,13 @@ class _EventDetailModalState extends ConsumerState<EventDetailModal> {
                                     ),
                                     const SizedBox(width: 10),
                                     Padding(
-                                      padding:
-                                          const EdgeInsets.only(bottom: 8),
+                                      padding: const EdgeInsets.only(bottom: 8),
                                       child: Column(
                                         crossAxisAlignment:
                                             CrossAxisAlignment.start,
                                         children: <Widget>[
                                           Text(
-                                            unit,
+                                            countPhrase,
                                             style: TextStyle(
                                               color: Colors.white
                                                   .withValues(alpha: 0.90),
@@ -266,7 +268,8 @@ class _EventDetailModalState extends ConsumerState<EventDetailModal> {
                           _InfoRow(
                             icon: Icons.calendar_today_rounded,
                             label: 'Created',
-                            value: DateFormat('MMM d, y').format(event.createdAt),
+                            value:
+                                DateFormat('MMM d, y').format(event.createdAt),
                             iconColor: accentColor,
                           ),
                           _InfoRow(
@@ -282,7 +285,8 @@ class _EventDetailModalState extends ConsumerState<EventDetailModal> {
                             value: event.reminderDays.isEmpty
                                 ? 'None'
                                 : event.reminderDays
-                                    .map((int d) => d == 0 ? 'On day' : '$d d before')
+                                    .map((int d) =>
+                                        d == 0 ? 'On day' : '$d d before')
                                     .join(', '),
                             iconColor: accentColor,
                             isLast: true,

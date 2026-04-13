@@ -82,13 +82,17 @@ class EventsNotifier extends StateNotifier<List<EventModel>> {
       updatedAt: now,
     );
     await _syncService.syncEvent(event);
-    await _notificationService.scheduleEventReminders(event);
+    if (event.reminderDays.isNotEmpty && await _notificationService.hasNotificationPermission()) {
+      await _notificationService.scheduleEventReminders(event);
+    }
   }
 
   Future<void> updateEvent(EventModel event) async {
     final EventModel updated = event.copyWith(updatedAt: DateTime.now());
     await _syncService.syncEvent(updated);
-    await _notificationService.scheduleEventReminders(updated);
+    if (updated.reminderDays.isNotEmpty && await _notificationService.hasNotificationPermission()) {
+      await _notificationService.scheduleEventReminders(updated);
+    }
   }
 
   Future<void> deleteEvent(String id) async {

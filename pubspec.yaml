@@ -1,5 +1,5 @@
 name: daymark
-description: DayMark - Day Counter & Tracker
+description: Event Counter - Day Counter & Tracker
 publish_to: "none"
 version: 1.0.0+1
 
@@ -32,6 +32,8 @@ dependencies:
   csv: ^6.0.0
   package_info_plus: ^8.0.2
   timezone: ^0.9.4
+  url_launcher: ^6.3.1
+  cryptography: ^2.7.0
 
 dev_dependencies:
   flutter_test:
@@ -39,6 +41,46 @@ dev_dependencies:
   flutter_lints: ^4.0.0
   build_runner: ^2.4.11
   hive_generator: ^2.0.1
+  flutter_launcher_icons: ^0.14.3
+  flutter_native_splash: ^2.4.6
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/branding/
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  web:
+    generate: true
+    image_path: assets/branding/app_logo.png
+    background_color: "#1E2A78"
+    theme_color: "#5E6AD2"
+  windows:
+    generate: true
+    image_path: assets/branding/app_logo.png
+    icon_size: 256
+  macos:
+    generate: true
+    image_path: assets/branding/app_logo.png
+  image_path: assets/branding/app_logo.png
+  remove_alpha_ios: true
+  adaptive_icon_background: "#1E2A78"
+  adaptive_icon_foreground: assets/branding/app_logo.png
+  adaptive_icon_monochrome: assets/branding/app_logo.png
+
+flutter_native_splash:
+  color: "#1E2A78"
+  color_dark: "#0D1117"
+  image: assets/branding/app_logo.png
+  image_dark: assets/branding/app_logo.png
+  android: true
+  ios: true
+  web: true
+  android_12:
+    color: "#1E2A78"
+    color_dark: "#0D1117"
+    image: assets/branding/app_logo.png
+    image_dark: assets/branding/app_logo.png
+

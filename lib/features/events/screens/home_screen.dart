@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'package:intl/intl.dart';
 import 'package:screenshot/screenshot.dart';
+import '../../../core/hive_boxes.dart';
 import '../../../core/constants.dart';
 import '../../../core/sync_service.dart';
 import '../../../shared/utils/date_helpers.dart';
@@ -27,7 +29,10 @@ class HomeScreen extends ConsumerStatefulWidget {
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
+  static const String _homeCardViewSettingKey = 'home_card_view_v1';
+
   int _navIndex = 0;
+  late final PageController _pageController;
   final ScreenshotController _screenshotController = ScreenshotController();
   final EventShareService _eventShareService = const EventShareService();
   final TextEditingController _searchController = TextEditingController();
@@ -35,10 +40,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   String _searchQuery = '';
   String _selectedCategory = 'All';
   _EventSort _sort = _EventSort.nearest;
+  _HomeCardView _cardView = _HomeCardView.comfortable;
   bool _filtersExpanded = false;
 
   @override
+  void initState() {
+    super.initState();
+    _pageController = PageController(initialPage: _tabIndexFromNav(_navIndex));
+    _cardView = _readPersistedCardView();
+  }
+
+  @override
   void dispose() {
+    _pageController.dispose();
     _searchController.dispose();
     super.dispose();
   }
@@ -53,7 +67,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     ];
 
     return Scaffold(
-      body: tabs[_tabIndexFromNav(_navIndex)],
+      body: PageView(
+        controller: _pageController,
+        onPageChanged: (int pageIndex) {
+          setState(() {
+            _navIndex = _navIndexFromTab(pageIndex);
+          });
+        },
+        children: tabs,
+      ),
       bottomNavigationBar: BottomNav(
         currentIndex: _navIndex,
         onTap: (int index) {
@@ -62,14 +84,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             // regardless of which tab the user was on when they tapped New.
             Navigator.of(context)
                 .push(
-                  MaterialPageRoute<void>(
-                      builder: (_) => const AddEditEventScreen()),
-                )
+              MaterialPageRoute<void>(
+                  builder: (_) => const AddEditEventScreen()),
+            )
                 .then((_) {
-              if (mounted) setState(() => _navIndex = 0);
+              if (mounted) {
+                _pageController.animateToPage(
+                  0,
+                  duration: const Duration(milliseconds: 250),
+                  curve: Curves.easeOutCubic,
+                );
+                setState(() => _navIndex = 0);
+              }
             });
             return;
           }
+          _pageController.animateToPage(
+            _tabIndexFromNav(index),
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeOutCubic,
+          );
           setState(() {
             _navIndex = index;
           });
@@ -84,6 +118,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     return 3;
   }
 
+  int _navIndexFromTab(int tabIndex) {
+    if (tabIndex <= 1) return tabIndex;
+    if (tabIndex == 2) return 3;
+    return 4;
+  }
+
   Widget _eventsTab(BuildContext context) {
     final events = ref.watch(eventsProvider);
     final habits = ref.watch(habitsProvider);
@@ -92,12 +132,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     // Count how many events are happening this week
     final DateTime now = DateTime.now();
     final DateTime today = DateTime(now.year, now.month, now.day);
-    final int thisWeekCount = events
-        .where((e) {
-          final d = DateTime(e.date.year, e.date.month, e.date.day);
-          return d.difference(today).inDays <= 7 && !d.isBefore(today);
-        })
-        .length;
+    final int thisWeekCount = events.where((e) {
+      final d = DateTime(e.date.year, e.date.month, e.date.day);
+      return d.difference(today).inDays <= 7 && !d.isBefore(today);
+    }).length;
 
     return RefreshIndicator(
       onRefresh: () async {
@@ -122,7 +160,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   ? CrossFadeState.showSecond
                   : CrossFadeState.showFirst,
               firstChild: const SizedBox.shrink(),
-              secondChild: _buildFilterPanel(context, events.length, visibleEvents.length),
+              secondChild: _buildFilterPanel(
+                  context, events.length, visibleEvents.length),
             ),
           ),
           // ── Empty states ───────────────────────────────────────────────
@@ -146,11 +185,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  Widget _buildGreetingHeader(BuildContext context, int thisWeekCount, int habitCount) {
+  Widget _buildGreetingHeader(
+      BuildContext context, int thisWeekCount, int habitCount) {
     final scheme = Theme.of(context).colorScheme;
     final hour = DateTime.now().hour;
-    final String greeting =
-        hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+    final String greeting = hour < 12
+        ? 'Good morning'
+        : hour < 17
+            ? 'Good afternoon'
+            : 'Good evening';
     final String dateStr = DateFormat('EEEE, MMMM d').format(DateTime.now());
 
     return Padding(
@@ -223,7 +266,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           setState(() => _searchQuery = '');
                         },
                         icon: Icon(Icons.cancel_rounded,
-                            color: scheme.onSurface.withValues(alpha: 0.35), size: 18),
+                            color: scheme.onSurface.withValues(alpha: 0.35),
+                            size: 18),
                       )
                     : null,
               ),
@@ -240,12 +284,41 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               borderRadius: BorderRadius.circular(14),
             ),
             child: IconButton(
-              onPressed: () => setState(() => _filtersExpanded = !_filtersExpanded),
+              onPressed: () =>
+                  setState(() => _filtersExpanded = !_filtersExpanded),
               icon: Icon(
                 Icons.tune_rounded,
-                color: _filtersExpanded ? scheme.onPrimaryContainer : scheme.onSurface.withValues(alpha: 0.55),
+                color: _filtersExpanded
+                    ? scheme.onPrimaryContainer
+                    : scheme.onSurface.withValues(alpha: 0.55),
               ),
               tooltip: 'Filter & sort',
+            ),
+          ),
+          const SizedBox(width: 8),
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            decoration: BoxDecoration(
+              color: _cardView == _HomeCardView.comfortable
+                  ? scheme.secondaryContainer
+                  : scheme.surfaceContainerHighest.withValues(alpha: 0.6),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: IconButton(
+              onPressed: () {
+                _setCardView(
+                  _cardView == _HomeCardView.comfortable
+                      ? _HomeCardView.compact
+                      : _HomeCardView.comfortable,
+                );
+              },
+              icon: Icon(
+                _cardView.icon,
+                color: _cardView == _HomeCardView.comfortable
+                    ? scheme.onSecondaryContainer
+                    : scheme.onSurface.withValues(alpha: 0.55),
+              ),
+              tooltip: 'Card view: ${_cardView.label}',
             ),
           ),
         ],
@@ -253,7 +326,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  Widget _buildFilterPanel(BuildContext context, int totalCount, int visibleCount) {
+  Widget _buildFilterPanel(
+      BuildContext context, int totalCount, int visibleCount) {
     final scheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
@@ -269,7 +343,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(
-                children: <String>['All', ...AppConstants.predefinedCategories].map(
+                children:
+                    <String>['All', ...AppConstants.predefinedCategories].map(
                   (String cat) {
                     final bool selected = _selectedCategory == cat;
                     return Padding(
@@ -280,10 +355,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         selectedColor: scheme.primary,
                         labelStyle: TextStyle(
                           color: selected ? scheme.onPrimary : scheme.onSurface,
-                          fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                          fontWeight:
+                              selected ? FontWeight.w700 : FontWeight.w500,
                         ),
                         backgroundColor: scheme.surface,
-                        onSelected: (_) => setState(() => _selectedCategory = cat),
+                        onSelected: (_) =>
+                            setState(() => _selectedCategory = cat),
                       ),
                     );
                   },
@@ -301,7 +378,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ),
                 const Spacer(),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
                     color: scheme.surface,
                     borderRadius: BorderRadius.circular(10),
@@ -327,6 +405,31 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ),
               ],
             ),
+            const SizedBox(height: 12),
+            Text(
+              'Card view',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: scheme.onSurface.withValues(alpha: 0.6),
+                    fontWeight: FontWeight.w600,
+                  ),
+            ),
+            const SizedBox(height: 8),
+            SegmentedButton<_HomeCardView>(
+              segments: _HomeCardView.values
+                  .map(
+                    (_HomeCardView view) => ButtonSegment<_HomeCardView>(
+                      value: view,
+                      icon: Icon(view.icon, size: 18),
+                      label: Text(view.label),
+                    ),
+                  )
+                  .toList(growable: false),
+              selected: <_HomeCardView>{_cardView},
+              onSelectionChanged: (Set<_HomeCardView> selection) {
+                if (selection.isEmpty) return;
+                _setCardView(selection.first);
+              },
+            ),
           ],
         ),
       ),
@@ -350,7 +453,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
               child: Center(
                 child: Text(
-                  isEmpty ? '📅' : '🔍',
+                  isEmpty ? '🗓️' : '🔍',
                   style: const TextStyle(fontSize: 44),
                 ),
               ),
@@ -386,10 +489,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   List<EventModel> _buildVisibleEvents(List<EventModel> events) {
     final List<EventModel> filtered = events.where((EventModel event) {
-      final bool categoryOk = _selectedCategory == 'All' || event.category == _selectedCategory;
+      final bool categoryOk =
+          _selectedCategory == 'All' || event.category == _selectedCategory;
       if (!categoryOk) return false;
       if (_searchQuery.isEmpty) return true;
-      final String haystack = '${event.title} ${event.notes} ${event.category}'.toLowerCase();
+      final String haystack =
+          '${event.title} ${event.notes} ${event.category}'.toLowerCase();
       return haystack.contains(_searchQuery);
     }).toList(growable: false);
 
@@ -421,10 +526,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     });
   }
 
-  List<Widget> _buildSectionedSlivers(BuildContext context, List<EventModel> events) {
+  List<Widget> _buildSectionedSlivers(
+      BuildContext context, List<EventModel> events) {
     final List<Widget> slivers = <Widget>[];
-    final List<EventModel> pinned = events.where((e) => e.isPinned).toList(growable: false);
-    final List<EventModel> regular = events.where((e) => !e.isPinned).toList(growable: false);
+    final List<EventModel> pinned =
+        events.where((e) => e.isPinned).toList(growable: false);
+    final List<EventModel> regular =
+        events.where((e) => !e.isPinned).toList(growable: false);
 
     if (pinned.isNotEmpty) {
       slivers.add(_sectionHeader(context, '📌  Pinned'));
@@ -432,8 +540,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     }
 
     final Map<String, List<EventModel>> sections = <String, List<EventModel>>{
-      '📅  This Week': <EventModel>[],
-      '🗓  This Month': <EventModel>[],
+      '🗓️  This Week': <EventModel>[],
+      '🗓️  This Month': <EventModel>[],
       '🔭  Later': <EventModel>[],
       '⏳  Past & Count Up': <EventModel>[],
     };
@@ -484,7 +592,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget _eventList(BuildContext context, List<EventModel> events) {
     return SliverList(
       delegate: SliverChildBuilderDelegate(
-        (BuildContext context, int index) => _buildEventTile(context, events[index]),
+        (BuildContext context, int index) =>
+            _buildEventTile(context, events[index]),
         childCount: events.length,
       ),
     );
@@ -493,82 +602,114 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   String _bucketFor(EventModel event) {
     final DateTime now = DateTime.now();
     final DateTime today = DateTime(now.year, now.month, now.day);
-    final DateTime eventDay = DateTime(event.date.year, event.date.month, event.date.day);
+    final DateTime eventDay =
+        DateTime(event.date.year, event.date.month, event.date.day);
 
     if (event.mode == EventMode.countup || eventDay.isBefore(today)) {
       return '⏳  Past & Count Up';
     }
     final int diff = eventDay.difference(today).inDays;
-    if (diff <= 7) return '📅  This Week';
-    if (diff <= 31) return '🗓  This Month';
+    if (diff <= 7) return '🗓️  This Week';
+    if (diff <= 31) return '🗓️  This Month';
     return '🔭  Later';
   }
 
-   Widget _buildEventTile(BuildContext context, EventModel event) {
-     return EventCardPolished(
-       event: event,
-       onTap: () => _showEventDetail(context, event),
-       onShare: () => _shareEvent(event),
-       onEdit: () {
-         Navigator.of(context).push(
-           MaterialPageRoute<void>(builder: (_) => AddEditEventScreen(existing: event)),
-         );
-       },
-       onDelete: () {
-         ref.read(eventsProvider.notifier).deleteEvent(event.id);
-         ScaffoldMessenger.of(context).showSnackBar(
-           const SnackBar(content: Text('Event deleted')),
-         );
-       },
-       onAddToHomeScreen: () => _addEventToHomeScreen(event),
-     );
-   }
+  Widget _buildEventTile(BuildContext context, EventModel event) {
+    return EventCardPolished(
+      event: event,
+      density: _cardView == _HomeCardView.comfortable
+          ? EventCardDensity.comfortable
+          : EventCardDensity.compact,
+      onTap: () => _showEventDetail(context, event),
+      onShare: () => _shareEvent(event),
+      onEdit: () {
+        Navigator.of(context).push(
+          MaterialPageRoute<void>(
+              builder: (_) => AddEditEventScreen(existing: event)),
+        );
+      },
+      onDelete: () {
+        ref.read(eventsProvider.notifier).deleteEvent(event.id);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Event deleted')),
+        );
+      },
+      onAddToHomeScreen: () => _addEventToHomeScreen(event),
+    );
+  }
 
-   Future<void> _showEventDetail(BuildContext context, EventModel event) async {
-     final result = await showModalBottomSheet<String>(
-       context: context,
-       builder: (_) => EventDetailModal(event: event),
-       backgroundColor: Colors.transparent,
-       isScrollControlled: true,
-     );
+  Future<void> _showEventDetail(BuildContext context, EventModel event) async {
+    final result = await showModalBottomSheet<String>(
+      context: context,
+      builder: (_) => EventDetailModal(event: event),
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+    );
 
-     if (result == 'edit' && mounted) {
-       // ignore: use_build_context_synchronously
-       Navigator.of(context).push(
-         MaterialPageRoute<void>(builder: (_) => AddEditEventScreen(existing: event)),
-       );
-     } else if (result == 'delete' && mounted) {
-       ref.read(eventsProvider.notifier).deleteEvent(event.id);
-       // ignore: use_build_context_synchronously
-       ScaffoldMessenger.of(context).showSnackBar(
-         const SnackBar(content: Text('Event deleted')),
-       );
-     } else if (result == 'add_widget' && mounted) {
-       _addEventToHomeScreen(event);
-     }
-   }
+    if (result == 'edit' && mounted) {
+      // ignore: use_build_context_synchronously
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+            builder: (_) => AddEditEventScreen(existing: event)),
+      );
+    } else if (result == 'delete' && mounted) {
+      ref.read(eventsProvider.notifier).deleteEvent(event.id);
+      // ignore: use_build_context_synchronously
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Event deleted')),
+      );
+    } else if (result == 'add_widget' && mounted) {
+      _addEventToHomeScreen(event);
+    }
+  }
 
-   Future<void> _shareEvent(EventModel event) async {
-     final bytes = await _screenshotController.captureFromWidget(
-       _eventShareService.buildShareCard(
-         emoji: event.emoji,
-         title: event.title,
-         subtitle: '${event.category} • ${DateHelpers.eventCountDescription(event)}',
-         color: Color(event.color),
-       ),
-       pixelRatio: 2,
-     );
-     await _eventShareService.shareCardImage(bytes);
-   }
+  Future<void> _shareEvent(EventModel event) async {
+    final bytes = await _screenshotController.captureFromWidget(
+      _eventShareService.buildShareCard(
+        emoji: event.emoji,
+        title: event.title,
+        subtitle:
+            '${event.category} • ${DateHelpers.eventCountDescription(event)}',
+        color: Color(event.color),
+      ),
+      pixelRatio: 2,
+    );
+    await _eventShareService.shareCardImage(bytes);
+  }
 
-   Future<void> _addEventToHomeScreen(EventModel event) async {
-     // Show a dialog for per-event widget configuration
-     if (!mounted) return;
-     showDialog<void>(
-       context: context,
-       builder: (BuildContext context) => _EventWidgetConfigDialog(event: event),
-     );
-   }
+  Future<void> _addEventToHomeScreen(EventModel event) async {
+    // Show a dialog for per-event widget configuration
+    if (!mounted) return;
+    showDialog<void>(
+      context: context,
+      builder: (BuildContext context) => _EventWidgetConfigDialog(event: event),
+    );
+  }
+
+  void _setCardView(_HomeCardView view) {
+    if (_cardView == view) {
+      return;
+    }
+    setState(() => _cardView = view);
+    if (Hive.isBoxOpen(HiveBoxes.settings)) {
+      Hive.box<dynamic>(HiveBoxes.settings)
+          .put(_homeCardViewSettingKey, view.name);
+    }
+  }
+
+  _HomeCardView _readPersistedCardView() {
+    if (!Hive.isBoxOpen(HiveBoxes.settings)) {
+      return _HomeCardView.comfortable;
+    }
+    final String? raw = Hive.box<dynamic>(HiveBoxes.settings)
+        .get(_homeCardViewSettingKey) as String?;
+    for (final _HomeCardView item in _HomeCardView.values) {
+      if (item.name == raw) {
+        return item;
+      }
+    }
+    return _HomeCardView.comfortable;
+  }
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -644,6 +785,15 @@ enum _EventSort {
   final String label;
 }
 
+enum _HomeCardView {
+  comfortable('Comfortable', Icons.view_agenda_rounded),
+  compact('Compact', Icons.view_headline_rounded);
+
+  const _HomeCardView(this.label, this.icon);
+  final String label;
+  final IconData icon;
+}
+
 // Per-event widget size selection and configuration dialog
 class _EventWidgetConfigDialog extends ConsumerStatefulWidget {
   const _EventWidgetConfigDialog({required this.event});
@@ -655,9 +805,10 @@ class _EventWidgetConfigDialog extends ConsumerStatefulWidget {
       _EventWidgetConfigDialogState();
 }
 
-class _EventWidgetConfigDialogState extends ConsumerState<_EventWidgetConfigDialog> {
+class _EventWidgetConfigDialogState
+    extends ConsumerState<_EventWidgetConfigDialog> {
   static const MethodChannel _widgetChannel =
-      MethodChannel('daymark/widget_actions');
+      MethodChannel('event_counter/widget_actions');
 
   late bool _transparent;
   late Color _bgColor;
@@ -682,13 +833,13 @@ class _EventWidgetConfigDialogState extends ConsumerState<_EventWidgetConfigDial
     try {
       // Write pending widget data so the new widget slot picks up this event
       await const EventHomeWidgetService().pushPendingEventWidget(
-        event:       widget.event,
+        event: widget.event,
         transparent: _transparent,
-        bgColor:     _bgColor,
-        textColor:   _textColor,
-        showEmoji:   _showEmoji,
-        showTitle:   _showTitle,
-        countUnit:   _countUnit,
+        bgColor: _bgColor,
+        textColor: _textColor,
+        showEmoji: _showEmoji,
+        showTitle: _showTitle,
+        countUnit: _countUnit,
       );
 
       // Attempt to pin the widget
@@ -717,7 +868,6 @@ class _EventWidgetConfigDialogState extends ConsumerState<_EventWidgetConfigDial
       );
     }
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -770,9 +920,7 @@ class _EventWidgetConfigDialogState extends ConsumerState<_EventWidgetConfigDial
                       style: TextStyle(
                         fontSize: 32,
                         fontWeight: FontWeight.w900,
-                        color: _transparent
-                            ? scheme.onSurface
-                            : _textColor,
+                        color: _transparent ? scheme.onSurface : _textColor,
                         height: 1.0,
                       ),
                     ),
@@ -780,9 +928,7 @@ class _EventWidgetConfigDialogState extends ConsumerState<_EventWidgetConfigDial
                       _countUnit,
                       style: TextStyle(
                         fontSize: 11,
-                        color: (_transparent
-                                ? scheme.onSurface
-                                : _textColor)
+                        color: (_transparent ? scheme.onSurface : _textColor)
                             .withValues(alpha: 0.75),
                       ),
                     ),
@@ -794,10 +940,9 @@ class _EventWidgetConfigDialogState extends ConsumerState<_EventWidgetConfigDial
                           widget.event.title,
                           style: TextStyle(
                             fontSize: 10,
-                            color: (_transparent
-                                    ? scheme.onSurface
-                                    : _textColor)
-                                .withValues(alpha: 0.65),
+                            color:
+                                (_transparent ? scheme.onSurface : _textColor)
+                                    .withValues(alpha: 0.65),
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -842,22 +987,19 @@ class _EventWidgetConfigDialogState extends ConsumerState<_EventWidgetConfigDial
             CheckboxListTile(
               title: const Text('Show emoji'),
               value: _showEmoji,
-              onChanged: (bool? v) =>
-                  setState(() => _showEmoji = v ?? true),
+              onChanged: (bool? v) => setState(() => _showEmoji = v ?? true),
               dense: true,
             ),
             CheckboxListTile(
               title: const Text('Show event name'),
               value: _showTitle,
-              onChanged: (bool? v) =>
-                  setState(() => _showTitle = v ?? true),
+              onChanged: (bool? v) => setState(() => _showTitle = v ?? true),
               dense: true,
             ),
             CheckboxListTile(
               title: const Text('Transparent background'),
               value: _transparent,
-              onChanged: (bool? v) =>
-                  setState(() => _transparent = v ?? false),
+              onChanged: (bool? v) => setState(() => _transparent = v ?? false),
               dense: true,
             ),
             const SizedBox(height: 12),

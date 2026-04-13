@@ -10,12 +10,12 @@ class EventShareService {
 
   Future<void> shareCardImage(Uint8List pngBytes) async {
     final Directory dir = await getTemporaryDirectory();
-    final File image = File('${dir.path}/daymark_share.png');
+    final File image = File('${dir.path}/event_counter_share.png');
     await image.writeAsBytes(pngBytes, flush: true);
 
     await Share.shareXFiles(
       <XFile>[XFile(image.path)],
-      text: 'Shared from DayMark',
+      text: 'Shared from Event Counter',
     );
   }
 
@@ -57,7 +57,7 @@ class EventShareService {
           ),
           const Spacer(),
           const Text(
-            'DayMark',
+            'Event Counter',
             style: TextStyle(color: Colors.white70, fontSize: 28),
           ),
         ],

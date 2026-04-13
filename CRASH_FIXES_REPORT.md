@@ -308,7 +308,7 @@ All platforms should now launch without crashes.
 
 ## Summary
 
-Your DayMark app is now fixed and will:
+Your EventCounter app is now fixed and will:
 
 ✅ **Work on Android** - Full features with Hive and notifications
 ✅ **Work on iOS** - Full features with Hive and notifications  

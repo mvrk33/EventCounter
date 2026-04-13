@@ -11,14 +11,23 @@ import '../features/events/models/event_model.dart';
 import '../features/habits/models/habit_model.dart';
 import 'auth_service.dart';
 import 'hive_boxes.dart';
+import 'pin_security_service.dart';
 
-final Provider<SyncService> syncServiceProvider = Provider<SyncService>((Ref ref) {
+final Provider<SyncService> syncServiceProvider =
+    Provider<SyncService>((Ref ref) {
   return SyncService(
     authService: ref.read(authServiceProvider),
+    pinSecurityService: ref.read(pinSecurityServiceProvider),
     firestore: Firebase.apps.isNotEmpty ? FirebaseFirestore.instance : null,
-    eventsBox: Hive.isBoxOpen(HiveBoxes.events) ? Hive.box<EventModel>(HiveBoxes.events) : null,
-    habitsBox: Hive.isBoxOpen(HiveBoxes.habits) ? Hive.box<HabitModel>(HiveBoxes.habits) : null,
-    syncMetaBox: Hive.isBoxOpen(HiveBoxes.syncMeta) ? Hive.box<dynamic>(HiveBoxes.syncMeta) : null,
+    eventsBox: Hive.isBoxOpen(HiveBoxes.events)
+        ? Hive.box<EventModel>(HiveBoxes.events)
+        : null,
+    habitsBox: Hive.isBoxOpen(HiveBoxes.habits)
+        ? Hive.box<HabitModel>(HiveBoxes.habits)
+        : null,
+    syncMetaBox: Hive.isBoxOpen(HiveBoxes.syncMeta)
+        ? Hive.box<dynamic>(HiveBoxes.syncMeta)
+        : null,
     connectivity: Connectivity(),
   );
 });
@@ -26,12 +35,14 @@ final Provider<SyncService> syncServiceProvider = Provider<SyncService>((Ref ref
 class SyncService {
   SyncService({
     required AuthService authService,
+    required PinSecurityService pinSecurityService,
     required FirebaseFirestore? firestore,
     required Box<EventModel>? eventsBox,
     required Box<HabitModel>? habitsBox,
     required Box<dynamic>? syncMetaBox,
     required Connectivity connectivity,
   })  : _authService = authService,
+        _pinSecurityService = pinSecurityService,
         _firestore = firestore,
         _eventsBox = eventsBox,
         _habitsBox = habitsBox,
@@ -39,6 +50,7 @@ class SyncService {
         _connectivity = connectivity;
 
   final AuthService _authService;
+  final PinSecurityService _pinSecurityService;
   final FirebaseFirestore? _firestore;
   final Box<EventModel>? _eventsBox;
   final Box<HabitModel>? _habitsBox;
@@ -52,7 +64,8 @@ class SyncService {
 
   Future<bool> shouldAutoRestoreOnLaunch() async {
     final bool disabled =
-        (_syncMetaBox?.get(_autoRestoreDisabledKeyForCurrentUser()) as bool?) ?? false;
+        (_syncMetaBox?.get(_autoRestoreDisabledKeyForCurrentUser()) as bool?) ??
+            false;
     return !disabled;
   }
 
@@ -80,7 +93,8 @@ class SyncService {
 
   Future<void> clearCloudBackup({ScaffoldMessengerState? messenger}) async {
     if (!_canCloudSync()) {
-      _showSnackBar(messenger, 'Cloud backup unavailable in guest/offline mode.');
+      _showSnackBar(
+          messenger, 'Cloud backup unavailable in guest/offline mode.');
       return;
     }
 
@@ -91,11 +105,15 @@ class SyncService {
       final CollectionReference<Map<String, dynamic>> habitsRef =
           _firestore.collection('users').doc(uid).collection('habits');
 
-      final QuerySnapshot<Map<String, dynamic>> eventsSnapshot = await eventsRef.get();
-      final QuerySnapshot<Map<String, dynamic>> habitsSnapshot = await habitsRef.get();
+      final QuerySnapshot<Map<String, dynamic>> eventsSnapshot =
+          await eventsRef.get();
+      final QuerySnapshot<Map<String, dynamic>> habitsSnapshot =
+          await habitsRef.get();
 
-      await _deleteDocsInBatches(eventsSnapshot.docs.map((doc) => doc.reference));
-      await _deleteDocsInBatches(habitsSnapshot.docs.map((doc) => doc.reference));
+      await _deleteDocsInBatches(
+          eventsSnapshot.docs.map((doc) => doc.reference));
+      await _deleteDocsInBatches(
+          habitsSnapshot.docs.map((doc) => doc.reference));
 
       await _setLastSyncedNow();
       _showSnackBar(messenger, 'Cloud backup cleared (events/habits only).');
@@ -112,9 +130,17 @@ class SyncService {
     try {
       final String uid = _authService.currentUser!.uid;
       final QuerySnapshot<Map<String, dynamic>> eventsSnapshot =
-          await _firestore!.collection('users').doc(uid).collection('events').get();
+          await _firestore!
+              .collection('users')
+              .doc(uid)
+              .collection('events')
+              .get();
       final QuerySnapshot<Map<String, dynamic>> habitsSnapshot =
-          await _firestore.collection('users').doc(uid).collection('habits').get();
+          await _firestore
+              .collection('users')
+              .doc(uid)
+              .collection('habits')
+              .get();
 
       return CloudBackupSummary(
         eventsCount: eventsSnapshot.docs.length,
@@ -149,13 +175,25 @@ class SyncService {
       final String uid = _authService.currentUser!.uid;
 
       for (final EventModel event in _eventsBox.values) {
-        final DocumentReference<Map<String, dynamic>> ref = _eventDoc(uid, event.id);
-        batch.set(ref, event.toFirestore(), SetOptions(merge: true));
+        final DocumentReference<Map<String, dynamic>> ref =
+            _eventDoc(uid, event.id);
+        final Map<String, dynamic>? payload = await _eventCloudPayload(event);
+        if (payload == null) {
+          _showSnackBar(messenger, 'Set a PIN to use encrypted cloud sync.');
+          return;
+        }
+        batch.set(ref, payload, SetOptions(merge: true));
       }
 
       for (final HabitModel habit in _habitsBox.values) {
-        final DocumentReference<Map<String, dynamic>> ref = _habitDoc(uid, habit.id);
-        batch.set(ref, habit.toFirestore(), SetOptions(merge: true));
+        final DocumentReference<Map<String, dynamic>> ref =
+            _habitDoc(uid, habit.id);
+        final Map<String, dynamic>? payload = await _habitCloudPayload(habit);
+        if (payload == null) {
+          _showSnackBar(messenger, 'Set a PIN to use encrypted cloud sync.');
+          return;
+        }
+        batch.set(ref, payload, SetOptions(merge: true));
       }
 
       await batch.commit();
@@ -179,22 +217,40 @@ class SyncService {
     try {
       final String uid = _authService.currentUser!.uid;
       final QuerySnapshot<Map<String, dynamic>> eventsSnapshot =
-          await _firestore!.collection('users').doc(uid).collection('events').get();
+          await _firestore!
+              .collection('users')
+              .doc(uid)
+              .collection('events')
+              .get();
       final QuerySnapshot<Map<String, dynamic>> habitsSnapshot =
-          await _firestore.collection('users').doc(uid).collection('habits').get();
+          await _firestore
+              .collection('users')
+              .doc(uid)
+              .collection('habits')
+              .get();
 
-      for (final QueryDocumentSnapshot<Map<String, dynamic>> doc in eventsSnapshot.docs) {
-        final EventModel remoteEvent = EventModel.fromFirestore(doc.data());
+      for (final QueryDocumentSnapshot<Map<String, dynamic>> doc
+          in eventsSnapshot.docs) {
+        final EventModel? remoteEvent = await _eventFromCloud(doc.data());
+        if (remoteEvent == null) {
+          continue;
+        }
         final EventModel? localEvent = _eventsBox.get(remoteEvent.id);
-        if (localEvent == null || remoteEvent.updatedAt.isAfter(localEvent.updatedAt)) {
+        if (localEvent == null ||
+            remoteEvent.updatedAt.isAfter(localEvent.updatedAt)) {
           await _eventsBox.put(remoteEvent.id, remoteEvent);
         }
       }
 
-      for (final QueryDocumentSnapshot<Map<String, dynamic>> doc in habitsSnapshot.docs) {
-        final HabitModel remoteHabit = HabitModel.fromFirestore(doc.data());
+      for (final QueryDocumentSnapshot<Map<String, dynamic>> doc
+          in habitsSnapshot.docs) {
+        final HabitModel? remoteHabit = await _habitFromCloud(doc.data());
+        if (remoteHabit == null) {
+          continue;
+        }
         final HabitModel? localHabit = _habitsBox.get(remoteHabit.id);
-        if (localHabit == null || remoteHabit.updatedAt.isAfter(localHabit.updatedAt)) {
+        if (localHabit == null ||
+            remoteHabit.updatedAt.isAfter(localHabit.updatedAt)) {
           await _habitsBox.put(remoteHabit.id, remoteHabit);
         }
       }
@@ -215,10 +271,13 @@ class SyncService {
       return;
     }
 
-    await _eventDoc(_authService.currentUser!.uid, event.id).set(
-      event.toFirestore(),
-      SetOptions(merge: true),
-    );
+    final Map<String, dynamic>? payload = await _eventCloudPayload(event);
+    if (payload == null) {
+      await _enqueuePendingSync();
+      return;
+    }
+    await _eventDoc(_authService.currentUser!.uid, event.id)
+        .set(payload, SetOptions(merge: true));
     await _setLastSyncedNow();
   }
 
@@ -231,10 +290,13 @@ class SyncService {
       return;
     }
 
-    await _habitDoc(_authService.currentUser!.uid, habit.id).set(
-      habit.toFirestore(),
-      SetOptions(merge: true),
-    );
+    final Map<String, dynamic>? payload = await _habitCloudPayload(habit);
+    if (payload == null) {
+      await _enqueuePendingSync();
+      return;
+    }
+    await _habitDoc(_authService.currentUser!.uid, habit.id)
+        .set(payload, SetOptions(merge: true));
     await _setLastSyncedNow();
   }
 
@@ -267,8 +329,10 @@ class SyncService {
     if (!pending) {
       return;
     }
-    final List<ConnectivityResult> connectivity = await _connectivity.checkConnectivity();
-    if (!connectivity.any((ConnectivityResult e) => e != ConnectivityResult.none)) {
+    final List<ConnectivityResult> connectivity =
+        await _connectivity.checkConnectivity();
+    if (!connectivity
+        .any((ConnectivityResult e) => e != ConnectivityResult.none)) {
       return;
     }
     await syncAll();
@@ -281,9 +345,83 @@ class SyncService {
     return _firestore != null && _authService.isSignedIn;
   }
 
+  bool get _shouldEncryptCloud =>
+      _pinSecurityService.isCloudBackupEncryptionEnabled;
+
+  Future<Map<String, dynamic>?> _eventCloudPayload(EventModel event) async {
+    if (!_shouldEncryptCloud) {
+      return event.toFirestore();
+    }
+    await _pinSecurityService.ensureEncryptionKey();
+
+    final Map<String, String>? encrypted =
+        await _pinSecurityService.encryptJson(event.toJson());
+    if (encrypted == null) {
+      return null;
+    }
+    return <String, dynamic>{
+      'id': event.id,
+      'updatedAt': Timestamp.fromDate(event.updatedAt),
+      'encrypted': true,
+      'payload': encrypted,
+    };
+  }
+
+  Future<Map<String, dynamic>?> _habitCloudPayload(HabitModel habit) async {
+    if (!_shouldEncryptCloud) {
+      return habit.toFirestore();
+    }
+    await _pinSecurityService.ensureEncryptionKey();
+
+    final Map<String, String>? encrypted =
+        await _pinSecurityService.encryptJson(habit.toJson());
+    if (encrypted == null) {
+      return null;
+    }
+    return <String, dynamic>{
+      'id': habit.id,
+      'updatedAt': Timestamp.fromDate(habit.updatedAt),
+      'encrypted': true,
+      'payload': encrypted,
+    };
+  }
+
+  Future<EventModel?> _eventFromCloud(Map<String, dynamic> data) async {
+    if ((data['encrypted'] as bool?) != true) {
+      return EventModel.fromFirestore(data);
+    }
+    final dynamic payload = data['payload'];
+    if (payload is! Map) {
+      return null;
+    }
+    final Map<String, dynamic>? decrypted =
+        await _pinSecurityService.decryptJson(payload.cast<String, dynamic>());
+    if (decrypted == null) {
+      return null;
+    }
+    return EventModel.fromJson(decrypted);
+  }
+
+  Future<HabitModel?> _habitFromCloud(Map<String, dynamic> data) async {
+    if ((data['encrypted'] as bool?) != true) {
+      return HabitModel.fromFirestore(data);
+    }
+    final dynamic payload = data['payload'];
+    if (payload is! Map) {
+      return null;
+    }
+    final Map<String, dynamic>? decrypted =
+        await _pinSecurityService.decryptJson(payload.cast<String, dynamic>());
+    if (decrypted == null) {
+      return null;
+    }
+    return HabitModel.fromJson(decrypted);
+  }
+
   Future<void> _setLastSyncedNow() async {
     if (_syncMetaBox != null) {
-      await _syncMetaBox.put('last_synced_at', DateTime.now().toUtc().toIso8601String());
+      await _syncMetaBox.put(
+          'last_synced_at', DateTime.now().toUtc().toIso8601String());
     }
   }
 
@@ -294,11 +432,19 @@ class SyncService {
   }
 
   DocumentReference<Map<String, dynamic>> _eventDoc(String uid, String id) {
-    return _firestore!.collection('users').doc(uid).collection('events').doc(id);
+    return _firestore!
+        .collection('users')
+        .doc(uid)
+        .collection('events')
+        .doc(id);
   }
 
   DocumentReference<Map<String, dynamic>> _habitDoc(String uid, String id) {
-    return _firestore!.collection('users').doc(uid).collection('habits').doc(id);
+    return _firestore!
+        .collection('users')
+        .doc(uid)
+        .collection('habits')
+        .doc(id);
   }
 
   Future<void> _deleteDocsInBatches(
@@ -337,4 +483,3 @@ class CloudBackupSummary {
 
   bool get hasBackup => eventsCount > 0 || habitsCount > 0;
 }
-

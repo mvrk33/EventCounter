@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flex_color_picker/flex_color_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -5,10 +7,12 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/constants.dart';
+import '../../notifications/notification_service.dart';
 import '../../../shared/utils/date_helpers.dart';
 import '../models/event_model.dart';
+import '../models/suggestion_result.dart';
 import '../providers/events_provider.dart';
-import '../utils/smart_category_helper.dart';
+import '../utils/suggestion_engine.dart';
 
 class AddEditEventScreen extends ConsumerStatefulWidget {
   const AddEditEventScreen({this.existing, super.key});
@@ -27,12 +31,34 @@ class _AddEditEventScreenState extends ConsumerState<AddEditEventScreen> {
   late String _emoji;
   late List<int> _reminderDays;
   late EventCountUnit _countUnit;
+  late EventRecurrence _recurrence;
 
-  SmartSuggestion? _pendingSuggestion;
+  SuggestionResult? _pendingSuggestion;
   bool _advancedOpen = false;
+  bool _suggestionDismissed = false;
+  bool _userHasCustomised = false;
+  bool _bannerExpanded = false;
+  bool _notificationPermissionChecked = false;
+  bool _hasNotificationPermission = true;
+
+  /// Debounce timer for the suggestion engine.
+  Timer? _debounce;
 
   static const List<String> _emojiRow = <String>[
-    '🎂','🎉','✈️','💪','🏆','❤️','🌟','📅','🎯','🚀','🩺','💼','🎓','🥳',
+    '🎂',
+    '🎉',
+    '✈️',
+    '💪',
+    '🏆',
+    '❤️',
+    '🌟',
+    '🗓️',
+    '🎯',
+    '🚀',
+    '🩺',
+    '💼',
+    '🎓',
+    '🥳',
   ];
 
   @override
@@ -44,36 +70,62 @@ class _AddEditEventScreenState extends ConsumerState<AddEditEventScreen> {
     _date = e?.date ?? DateTime.now().add(const Duration(days: 1));
     _category = e?.category ?? AppConstants.predefinedCategories.first;
     _color = e?.color ?? const Color(0xFF5E6AD2).toARGB32();
-    _emoji = e?.emoji ?? '📅';
+    _emoji = e?.emoji ?? '🗓️';
     _reminderDays = List<int>.from(e?.reminderDays ?? <int>[0, 1]);
     _countUnit = e?.countUnit ?? EventCountUnit.days;
+    _recurrence = e?.recurrence ?? EventRecurrence.once;
     _titleController.addListener(_onTitleChanged);
+    _refreshNotificationPermissionState();
   }
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _titleController.dispose();
     _notesController.dispose();
     super.dispose();
   }
 
   void _onTitleChanged() {
-    final SmartSuggestion? s =
-        SmartCategoryHelper.fromTitle(_titleController.text);
-    if (s != null && s.category != _category) {
-      setState(() => _pendingSuggestion = s);
-    } else if (s == null) {
+    // In edit mode, only show suggestion if the title actually changed.
+    if (widget.existing != null &&
+        _titleController.text.trim() == widget.existing!.title.trim()) {
       setState(() => _pendingSuggestion = null);
+      return;
     }
+
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 300), () {
+      if (!mounted) return;
+      if (_userHasCustomised || _suggestionDismissed) return;
+
+      final SuggestionResult? result =
+          SuggestionEngine.analyze(_titleController.text);
+      setState(() => _pendingSuggestion = result);
+    });
   }
 
   void _acceptSuggestion() {
-    if (_pendingSuggestion == null) return;
+    final SuggestionResult? s = _pendingSuggestion;
+    if (s == null) return;
     setState(() {
-      _category = _pendingSuggestion!.category;
-      _emoji = _pendingSuggestion!.emoji;
-      _color = _pendingSuggestion!.color;
+      _category = s.primaryCategory;
+      _emoji = s.emoji;
+      _color = s.primaryColor;
+      _recurrence = s.suggestedRecurrence;
+      if (s.suggestedReminderDays.isNotEmpty) {
+        _reminderDays = List<int>.from(s.suggestedReminderDays);
+      }
       _pendingSuggestion = null;
+      _bannerExpanded = false;
+    });
+  }
+
+  void _dismissSuggestion() {
+    setState(() {
+      _pendingSuggestion = null;
+      _suggestionDismissed = true;
+      _bannerExpanded = false;
     });
   }
 
@@ -109,6 +161,9 @@ class _AddEditEventScreenState extends ConsumerState<AddEditEventScreen> {
           const SizedBox(height: 16),
           // ── Count unit ─────────────────────────────────────────────
           _buildCountUnitSection(context, scheme),
+          const SizedBox(height: 16),
+          // ── Recurrence ─────────────────────────────────────────────
+          _buildRecurrenceSection(context, scheme),
           const SizedBox(height: 16),
           // ── Reminders ──────────────────────────────────────────────
           _buildRemindersSection(context, scheme),
@@ -190,75 +245,286 @@ class _AddEditEventScreenState extends ConsumerState<AddEditEventScreen> {
   }
 
   Widget _buildSuggestionBanner(BuildContext context, ColorScheme scheme) {
-    final SmartSuggestion s = _pendingSuggestion!;
+    final SuggestionResult s = _pendingSuggestion!;
+    final Color accent = Color(s.primaryColor);
+    final Color bg = Color(s.bgColor).withValues(alpha: 0.12);
+
+    // Confidence-based label
+    final String confidenceLabel = s.confidence >= 0.80
+        ? '✨ Looks like a ${s.primaryCategory}!'
+        : s.confidence >= 0.50
+            ? '💡 This might be a ${s.primaryCategory}'
+            : '🤔 Not sure — possibly ${s.primaryCategory}?';
+
+    // Recurrence hint text
+    final String recurrenceHint = s.suggestedRecurrence != EventRecurrence.once
+        ? ' · ${s.suggestedRecurrence.label}'
+        : '';
+
     return Padding(
       padding: const EdgeInsets.only(top: 8),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        decoration: BoxDecoration(
-          color: Color(s.color).withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: Color(s.color).withValues(alpha: 0.3)),
-        ),
-        child: Row(
-          children: <Widget>[
-            Text(s.emoji, style: const TextStyle(fontSize: 20)),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(
-                    '✨ Looks like a ${s.category}!',
-                    style: GoogleFonts.nunito(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: Color(s.color),
+      child: Semantics(
+        label:
+            'Smart suggestion: ${s.primaryCategory}. Tap Apply to use, or dismiss.',
+        child: GestureDetector(
+          onTap: () => setState(() => _bannerExpanded = !_bannerExpanded),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 220),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: bg,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: accent.withValues(alpha: 0.35)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                // ── Compact row ─────────────────────────────────────────
+                Row(
+                  children: <Widget>[
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 200),
+                      child: Text(
+                        s.emoji,
+                        key: ValueKey<String>(s.emoji),
+                        style: const TextStyle(fontSize: 22),
+                      ),
                     ),
-                  ),
-                  Text(
-                    s.suggestYearly
-                        ? 'Auto-fill: category, emoji, colour + yearly recurrence'
-                        : 'Auto-fill: category, emoji & colour',
-                    style: GoogleFonts.nunito(
-                      fontSize: 11,
-                      color: Color(s.color).withValues(alpha: 0.8),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          Text(
+                            confidenceLabel,
+                            style: GoogleFonts.nunito(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: accent,
+                            ),
+                          ),
+                          Text(
+                            'Tap Apply to auto-fill$recurrenceHint',
+                            style: GoogleFonts.nunito(
+                              fontSize: 11,
+                              color: accent.withValues(alpha: 0.75),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
-              ),
+                    const SizedBox(width: 6),
+                    // Apply button — minimum 64×36 dp touch target
+                    SizedBox(
+                      height: 36,
+                      child: FilledButton(
+                        onPressed: _acceptSuggestion,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: accent,
+                          minimumSize: const Size(64, 36),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 0),
+                          textStyle: GoogleFonts.nunito(
+                              fontSize: 12, fontWeight: FontWeight.w700),
+                        ),
+                        child: const Text('Apply'),
+                      ),
+                    ),
+                    // Dismiss — 44×44 dp touch target via padding
+                    Padding(
+                      padding: const EdgeInsets.all(8),
+                      child: GestureDetector(
+                        onTap: _dismissSuggestion,
+                        child: Icon(
+                          Icons.close_rounded,
+                          size: 16,
+                          color: accent.withValues(alpha: 0.55),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+
+                // ── Expanded panel ──────────────────────────────────────
+                AnimatedCrossFade(
+                  duration: const Duration(milliseconds: 240),
+                  crossFadeState: _bannerExpanded
+                      ? CrossFadeState.showSecond
+                      : CrossFadeState.showFirst,
+                  firstChild: const SizedBox.shrink(),
+                  secondChild: _buildBannerExpanded(context, s, accent),
+                ),
+              ],
             ),
-            const SizedBox(width: 8),
-            FilledButton(
-              onPressed: _acceptSuggestion,
-              style: FilledButton.styleFrom(
-                backgroundColor: Color(s.color),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                minimumSize: Size.zero,
-                textStyle:
-                    GoogleFonts.nunito(fontSize: 12, fontWeight: FontWeight.w700),
-              ),
-              child: const Text('Apply'),
-            ),
-            const SizedBox(width: 6),
-            InkWell(
-              onTap: () => setState(() => _pendingSuggestion = null),
-              child: Icon(
-                Icons.close_rounded,
-                size: 16,
-                color: Color(s.color).withValues(alpha: 0.5),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
   }
 
+  Widget _buildBannerExpanded(
+      BuildContext context, SuggestionResult s, Color accent) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          const Divider(height: 1, thickness: 0.5),
+          const SizedBox(height: 10),
+
+          // ── Emoji alternatives ───────────────────────────────────────
+          if (s.emojiAlternatives.isNotEmpty) ...<Widget>[
+            Text(
+              'SWAP EMOJI',
+              style: GoogleFonts.nunito(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                color: accent.withValues(alpha: 0.6),
+                letterSpacing: 0.8,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Row(
+              children: <Widget>[
+                // Current selection
+                _EmojiChip(
+                  emoji: s.emoji,
+                  selected: true,
+                  accent: accent,
+                  onTap: () {},
+                ),
+                const SizedBox(width: 6),
+                // Alternatives
+                ...s.emojiAlternatives.map((String e) => Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: _EmojiChip(
+                        emoji: e,
+                        selected: false,
+                        accent: accent,
+                        onTap: () {
+                          // Swap emoji and keep banner open
+                          setState(() {
+                            _pendingSuggestion = SuggestionResult(
+                              primaryCategory: s.primaryCategory,
+                              emoji: e,
+                              primaryColor: s.primaryColor,
+                              bgColor: s.bgColor,
+                              confidence: s.confidence,
+                              secondaryLabels: s.secondaryLabels,
+                              emojiAlternatives: <String>[
+                                s.emoji,
+                                ...s.emojiAlternatives.where(
+                                    (String x) => x != e),
+                              ],
+                              suggestedRecurrence: s.suggestedRecurrence,
+                              suggestedReminderDays: s.suggestedReminderDays,
+                              isAmbiguous: s.isAmbiguous,
+                              disambiguationOptions: s.disambiguationOptions,
+                            );
+                          });
+                        },
+                      ),
+                    )),
+              ],
+            ),
+            const SizedBox(height: 10),
+          ],
+
+          // ── Secondary labels ─────────────────────────────────────────
+          if (s.secondaryLabels.isNotEmpty) ...<Widget>[
+            Text(
+              'ALSO LOOKS LIKE',
+              style: GoogleFonts.nunito(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                color: accent.withValues(alpha: 0.6),
+                letterSpacing: 0.8,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: s.secondaryLabels.map((String label) {
+                return GestureDetector(
+                  onTap: () {
+                    // Let user switch to a secondary category
+                    setState(() {
+                      _pendingSuggestion = SuggestionResult(
+                        primaryCategory: label,
+                        emoji: s.emoji,
+                        primaryColor: s.primaryColor,
+                        bgColor: s.bgColor,
+                        confidence: s.confidence,
+                        secondaryLabels: <String>[s.primaryCategory],
+                        emojiAlternatives: s.emojiAlternatives,
+                        suggestedRecurrence: s.suggestedRecurrence,
+                        suggestedReminderDays: s.suggestedReminderDays,
+                        isAmbiguous: false,
+                        disambiguationOptions: const <String>[],
+                      );
+                    });
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: accent.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(20),
+                      border:
+                          Border.all(color: accent.withValues(alpha: 0.3)),
+                    ),
+                    child: Text(
+                      label,
+                      style: GoogleFonts.nunito(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: accent),
+                    ),
+                  ),
+                );
+              }).toList(growable: false),
+            ),
+            const SizedBox(height: 10),
+          ],
+
+          // ── Recurrence & reminder preview ───────────────────────────
+          Row(
+            children: <Widget>[
+              if (s.suggestedRecurrence != EventRecurrence.once)
+                _PreviewPill(
+                  icon: Icons.repeat_rounded,
+                  label: s.suggestedRecurrence.label,
+                  accent: accent,
+                ),
+              if (s.suggestedRecurrence != EventRecurrence.once)
+                const SizedBox(width: 6),
+              if (s.suggestedReminderDays.isNotEmpty)
+                _PreviewPill(
+                  icon: Icons.notifications_none_rounded,
+                  label: _reminderLabel(s.suggestedReminderDays),
+                  accent: accent,
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  static String _reminderLabel(List<int> days) {
+    if (days.isEmpty) return 'No reminders';
+    final List<String> parts = days.map((int d) {
+      if (d == 0) return 'On day';
+      return '${d}d before';
+    }).toList();
+    return parts.join(' · ');
+  }
+
   Widget _buildDateTile(BuildContext context, ColorScheme scheme) {
     final bool isToday = DateHelpers.sameDay(_date, DateTime.now());
-    final bool isTomorrow = DateHelpers.sameDay(
-        _date, DateTime.now().add(const Duration(days: 1)));
+    final bool isTomorrow =
+        DateHelpers.sameDay(_date, DateTime.now().add(const Duration(days: 1)));
     String label;
     if (isToday) {
       label = 'Today';
@@ -345,13 +611,14 @@ class _AddEditEventScreenState extends ConsumerState<AddEditEventScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        _SectionLabel(icon: Icons.timer_outlined, label: 'Count unit'),
+        const _SectionLabel(icon: Icons.timer_outlined, label: 'Count unit'),
         const SizedBox(height: 8),
         _FormCard(
           child: Row(
             children: EventCountUnit.values.map((EventCountUnit unit) {
               final bool selected = _countUnit == unit;
-              final String name = unit.name[0].toUpperCase() + unit.name.substring(1);
+              final String name =
+                  unit.name[0].toUpperCase() + unit.name.substring(1);
               return Expanded(
                 child: Padding(
                   padding: const EdgeInsets.only(right: 8),
@@ -361,10 +628,13 @@ class _AddEditEventScreenState extends ConsumerState<AddEditEventScreen> {
                       duration: const Duration(milliseconds: 160),
                       padding: const EdgeInsets.symmetric(vertical: 10),
                       decoration: BoxDecoration(
-                        color: selected ? scheme.primaryContainer : scheme.surfaceContainerHighest,
+                        color: selected
+                            ? scheme.primaryContainer
+                            : scheme.surfaceContainerHighest,
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
-                          color: selected ? scheme.primary : scheme.outlineVariant,
+                          color:
+                              selected ? scheme.primary : scheme.outlineVariant,
                           width: 1.5,
                         ),
                       ),
@@ -390,20 +660,90 @@ class _AddEditEventScreenState extends ConsumerState<AddEditEventScreen> {
     );
   }
 
+  Widget _buildRecurrenceSection(BuildContext context, ColorScheme scheme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        const _SectionLabel(icon: Icons.repeat_rounded, label: 'Repeat'),
+        const SizedBox(height: 8),
+        _FormCard(
+          child: Row(
+            children: EventRecurrence.values.map((EventRecurrence r) {
+              final bool selected = _recurrence == r;
+              return Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: GestureDetector(
+                    onTap: () => setState(() => _recurrence = r),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 160),
+                      padding: const EdgeInsets.symmetric(vertical: 9),
+                      decoration: BoxDecoration(
+                        color: selected
+                            ? scheme.primaryContainer
+                            : scheme.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: selected
+                              ? scheme.primary
+                              : scheme.outlineVariant,
+                          width: 1.5,
+                        ),
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: <Widget>[
+                          Text(
+                            r.emoji,
+                            style: const TextStyle(fontSize: 14),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            r == EventRecurrence.once
+                                ? 'Once'
+                                : r == EventRecurrence.weekly
+                                    ? 'Weekly'
+                                    : r == EventRecurrence.monthly
+                                        ? 'Monthly'
+                                        : 'Yearly',
+                            textAlign: TextAlign.center,
+                            style: GoogleFonts.nunito(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: selected
+                                  ? scheme.onPrimaryContainer
+                                  : scheme.onSurface.withValues(alpha: 0.65),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }).toList(growable: false),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildRemindersSection(BuildContext context, ColorScheme scheme) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        _SectionLabel(icon: Icons.notifications_outlined, label: 'Reminders'),
+        const _SectionLabel(icon: Icons.notifications_outlined, label: 'Reminders'),
         const SizedBox(height: 8),
         _FormCard(
           child: Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: <int>[0, 1, 7].map((int d) {
+            children: <int>[0, 1, 3, 7].map((int d) {
               final bool sel = _reminderDays.contains(d);
               return FilterChip(
-                label: Text(d == 0 ? 'On event day' : '$d day${d > 1 ? 's' : ''} before'),
+                label: Text(d == 0
+                    ? 'On event day'
+                    : '$d day${d > 1 ? 's' : ''} before'),
                 selected: sel,
                 selectedColor: scheme.primaryContainer,
                 checkmarkColor: scheme.primary,
@@ -428,6 +768,35 @@ class _AddEditEventScreenState extends ConsumerState<AddEditEventScreen> {
             }).toList(growable: false),
           ),
         ),
+        if (_notificationPermissionChecked && !_hasNotificationPermission) ...<Widget>[
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: scheme.errorContainer.withValues(alpha: 0.65),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: <Widget>[
+                Icon(
+                  Icons.notifications_off_rounded,
+                  size: 16,
+                  color: scheme.onErrorContainer,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Notifications are off. We will ask again when you save with reminders.',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: scheme.onErrorContainer,
+                          fontWeight: FontWeight.w600,
+                        ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -514,7 +883,7 @@ class _AddEditEventScreenState extends ConsumerState<AddEditEventScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         // Category
-        _SectionLabel(icon: Icons.label_outline_rounded, label: 'Category'),
+        const _SectionLabel(icon: Icons.label_outline_rounded, label: 'Category'),
         const SizedBox(height: 8),
         _FormCard(
           child: Wrap(
@@ -536,24 +905,22 @@ class _AddEditEventScreenState extends ConsumerState<AddEditEventScreen> {
                   color: selected ? scheme.primary : scheme.outlineVariant,
                   width: 1.2,
                 ),
-                onSelected: (_) {
-                  setState(() {
-                    _category = c;
-                    final SmartSuggestion? s =
-                        SmartCategoryHelper.fromCategory(c);
-                    if (s != null) {
-                      _emoji = s.emoji;
-                      _color = s.color;
-                    }
-                  });
-                },
+                 onSelected: (_) {
+                   setState(() {
+                     _category = c;
+                     _userHasCustomised = true;
+                     _pendingSuggestion = null;
+                     // Apply emoji defaults from the emoji bank for this category
+                     _emoji = _categoryDefaultEmoji(c);
+                   });
+                 },
               );
             }).toList(growable: false),
           ),
         ),
         const SizedBox(height: 16),
         // Emoji
-        _SectionLabel(icon: Icons.emoji_emotions_outlined, label: 'Emoji'),
+        const _SectionLabel(icon: Icons.emoji_emotions_outlined, label: 'Emoji'),
         const SizedBox(height: 8),
         _FormCard(
           child: Column(
@@ -586,8 +953,7 @@ class _AddEditEventScreenState extends ConsumerState<AddEditEventScreen> {
                                   color: scheme.outlineVariant, width: 1),
                         ),
                         child: Center(
-                          child: Text(e,
-                              style: const TextStyle(fontSize: 22)),
+                          child: Text(e, style: const TextStyle(fontSize: 22)),
                         ),
                       ),
                     );
@@ -599,7 +965,7 @@ class _AddEditEventScreenState extends ConsumerState<AddEditEventScreen> {
         ),
         const SizedBox(height: 16),
         // Colour
-        _SectionLabel(icon: Icons.palette_outlined, label: 'Colour'),
+        const _SectionLabel(icon: Icons.palette_outlined, label: 'Colour'),
         const SizedBox(height: 8),
         _FormCard(
           padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
@@ -650,8 +1016,7 @@ class _AddEditEventScreenState extends ConsumerState<AddEditEventScreen> {
   }
 
   Future<void> _pickColor() async {
-    final Color picked =
-        await showColorPickerDialog(context, Color(_color));
+    final Color picked = await showColorPickerDialog(context, Color(_color));
     setState(() => _color = picked.toARGB32());
   }
 
@@ -666,6 +1031,7 @@ class _AddEditEventScreenState extends ConsumerState<AddEditEventScreen> {
 
     final notifier = ref.read(eventsProvider.notifier);
     if (widget.existing == null) {
+      await _requestNotificationsIfNeeded();
       await notifier.addEvent(
         title: title,
         date: _date,
@@ -675,6 +1041,7 @@ class _AddEditEventScreenState extends ConsumerState<AddEditEventScreen> {
         notes: _notesController.text.trim(),
         reminderDays: _reminderDays,
         countUnit: _countUnit,
+        recurrence: _recurrence,
       );
     } else {
       await notifier.updateEvent(
@@ -687,6 +1054,7 @@ class _AddEditEventScreenState extends ConsumerState<AddEditEventScreen> {
           notes: _notesController.text.trim(),
           reminderDays: _reminderDays,
           countUnit: _countUnit,
+          recurrence: _recurrence,
           mode: _date.isAfter(DateTime.now())
               ? EventMode.countdown
               : EventMode.countup,
@@ -694,6 +1062,61 @@ class _AddEditEventScreenState extends ConsumerState<AddEditEventScreen> {
       );
     }
     if (mounted) Navigator.of(context).pop();
+  }
+
+  Future<void> _refreshNotificationPermissionState() async {
+    final NotificationService notificationService =
+        ref.read(notificationServiceProvider);
+    final bool granted = await notificationService.hasNotificationPermission();
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _notificationPermissionChecked = true;
+      _hasNotificationPermission = granted;
+    });
+  }
+
+  Future<void> _requestNotificationsIfNeeded() async {
+    if (_reminderDays.isEmpty) {
+      await _refreshNotificationPermissionState();
+      return;
+    }
+
+    final NotificationService notificationService =
+        ref.read(notificationServiceProvider);
+    if (await notificationService.hasNotificationPermission()) {
+      await _refreshNotificationPermissionState();
+      return;
+    }
+
+    final bool granted = await notificationService.requestPermissions();
+    if (mounted) {
+      setState(() {
+        _notificationPermissionChecked = true;
+        _hasNotificationPermission = granted;
+      });
+    }
+    if (!mounted || granted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Notifications are still disabled. You can enable them in Alerts later.')),
+    );
+  }
+
+  /// Returns a sensible default emoji for [category] without needing the
+  /// emoji bank import in this file.
+  static String _categoryDefaultEmoji(String category) {
+    const Map<String, String> defaults = <String, String>{
+      'Birthday': '🎂', 'Anniversary': '💑', 'Travel': '✈️',
+      'Health': '🩺', 'Fitness': '💪', 'Work': '💼',
+      'Finance': '💰', 'Education': '🎓', 'Personal': '⭐',
+      'Milestone': '🏆', 'Habit': '🔄', 'Home': '🏠',
+      'Vehicle': '🚗', 'Pet': '🐾', 'Food': '🍽️', 'Other': '🗓️',
+    };
+    return defaults[category] ?? '🗓️';
   }
 }
 
@@ -756,3 +1179,84 @@ class _FormCard extends StatelessWidget {
     );
   }
 }
+
+// ── Banner helper widgets ─────────────────────────────────────────────────────
+
+class _EmojiChip extends StatelessWidget {
+  const _EmojiChip({
+    required this.emoji,
+    required this.selected,
+    required this.accent,
+    required this.onTap,
+  });
+
+  final String emoji;
+  final bool selected;
+  final Color accent;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: selected
+              ? accent.withValues(alpha: 0.2)
+              : accent.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: selected ? accent : accent.withValues(alpha: 0.2),
+            width: selected ? 2 : 1,
+          ),
+        ),
+        child: Center(
+          child: Text(emoji, style: const TextStyle(fontSize: 20)),
+        ),
+      ),
+    );
+  }
+}
+
+class _PreviewPill extends StatelessWidget {
+  const _PreviewPill({
+    required this.icon,
+    required this.label,
+    required this.accent,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: accent.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: accent.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Icon(icon, size: 12, color: accent.withValues(alpha: 0.8)),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: GoogleFonts.nunito(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: accent.withValues(alpha: 0.85),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+

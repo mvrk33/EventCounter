@@ -8,7 +8,7 @@ class EventEmojiSuggester {
     'work': '💼',
     'anniversary': '💞',
     'personal': '✨',
-    'other': '📅',
+    'other': '🗓️',
   };
 
   static const Map<String, String> _keywordEmoji = <String, String>{
@@ -45,7 +45,6 @@ class EventEmojiSuggester {
       }
     }
 
-    return _categoryEmoji[normalizedCategory] ?? '📅';
+    return _categoryEmoji[normalizedCategory] ?? '🗓️';
   }
 }
-

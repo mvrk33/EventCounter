@@ -3,16 +3,27 @@ import 'package:flutter/material.dart';
 class AppConstants {
   const AppConstants._();
 
-  static const String appName = 'DayMark';
-  static const String appSubtitle = 'Day Counter & Tracker';
+  static const String appName = 'Event Counter';
+  static const String appSubtitle = 'Event Counter & Tracker';
+  static const String logoAssetPath = 'assets/branding/app_logo.png';
+  static const String loadingCaption = 'Track moments, milestones, and streaks.';
 
   static const List<String> predefinedCategories = <String>[
     'Birthday',
+    'Anniversary',
     'Travel',
     'Health',
+    'Fitness',
     'Work',
-    'Anniversary',
+    'Finance',
+    'Education',
+    'Milestone',
+    'Home',
+    'Vehicle',
+    'Pet',
+    'Habit',
     'Personal',
+    'Food',
     'Other',
   ];
 

@@ -28,7 +28,7 @@ enum EventRecurrence {
   String get emoji {
     switch (this) {
       case EventRecurrence.once:
-        return '📅';
+        return '🗓️';
       case EventRecurrence.weekly:
         return '🗓️';
       case EventRecurrence.monthly:
@@ -227,7 +227,7 @@ class EventModel {
       date: _parseDate(map[EventFields.date]),
       category: (map[EventFields.category] ?? 'Other').toString(),
       color: (map[EventFields.color] as int?) ?? 0xFF2196F3,
-      emoji: (map[EventFields.emoji] ?? '📅').toString(),
+      emoji: (map[EventFields.emoji] ?? '🗓️').toString(),
       notes: (map[EventFields.notes] ?? '').toString(),
       mode: _parseMode(modeValue),
       reminderDays: reminderRaw

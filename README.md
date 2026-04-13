@@ -1,4 +1,4 @@
-# DayMark - Day Counter & Tracker
+# Event Counter - Day Counter & Tracker
 
 [![Flutter](https://img.shields.io/badge/Flutter-Stable-02569B.svg?logo=flutter)](https://flutter.dev)
 [![Riverpod](https://img.shields.io/badge/State-Riverpod-00BFA5.svg)](https://riverpod.dev)
@@ -6,7 +6,7 @@
 [![Firebase](https://img.shields.io/badge/Cloud-Firebase-FFCA28.svg?logo=firebase)](https://firebase.google.com)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-DayMark is an offline-first day counter and habit tracker for Android and iOS. Track countdowns, count-ups, and daily streaks with local-first reliability and optional cloud backup.
+Event Counter is an offline-first day counter and habit tracker for Android and iOS. Track countdowns, count-ups, and daily streaks with local-first reliability and optional cloud backup.
 
 ## Offline-First Design
 - Primary storage is local Hive. The app works fully offline in guest mode.
@@ -70,6 +70,15 @@ service cloud.firestore {
 3. Run flutter pub get.
 4. Run dart run build_runner build --delete-conflicting-outputs.
 5. Run flutter run.
+
+## Branding Asset Regeneration
+- Source logos:
+  - `assets/branding/full_colored_logo.png`
+  - `assets/branding/monochrome_logo.png`
+- Regenerate app icons after updating branding assets:
+  - `dart run flutter_launcher_icons`
+- Regenerate native splash assets:
+  - `dart run flutter_native_splash:create`
 
 ## CI
 GitHub Actions workflow runs:

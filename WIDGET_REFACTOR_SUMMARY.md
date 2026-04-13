@@ -1,7 +1,7 @@
 # Widget Refactor Summary
 
 ## Overview
-Modified the Daymark app to replace the swipe-to-delete functionality with individual widget settings for each event. Now users can add each event as a separate widget to their home screen with custom per-event settings.
+Modified the EventCounter app to replace the swipe-to-delete functionality with individual widget settings for each event. Now users can add each event as a separate widget to their home screen with custom per-event settings.
 
 ## Changes Made
 

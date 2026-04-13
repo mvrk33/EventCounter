@@ -1,8 +1,8 @@
 # Material 3 Documentation Index
 
-## 📚 Complete Material 3 Implementation Guide for DayMark
+## 📚 Complete Material 3 Implementation Guide for EventCounter
 
-This document helps you navigate all Material 3 resources for the DayMark app.
+This document helps you navigate all Material 3 resources for the EventCounter app.
 
 ---
 
@@ -176,7 +176,7 @@ This document helps you navigate all Material 3 resources for the DayMark app.
 ## 📋 File Navigation Map
 
 ```
-DayMark/
+EventCounter/
 ├── 📄 MATERIAL3_SUMMARY.md                    ⭐ START HERE - Overview
 ├── 📄 MATERIAL3_QUICK_REFERENCE.md            ⭐ Quick code snippets
 ├── 📄 MATERIAL3_GUIDE.md                      📖 Complete reference
@@ -328,7 +328,7 @@ For Material 3 implementation questions:
 
 ## 🎊 You're Ready!
 
-You now have everything you need to implement Material 3 throughout your DayMark app. Pick a file above based on your needs and start coding!
+You now have everything you need to implement Material 3 throughout your EventCounter app. Pick a file above based on your needs and start coding!
 
 ---
 

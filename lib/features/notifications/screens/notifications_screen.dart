@@ -52,7 +52,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                       icon: Icons.notifications_active_rounded,
                       iconColor: const Color(0xFF5E6AD2),
                       title: 'Notification permission',
-                      subtitle: 'Allow DayMark to send reminders',
+                      subtitle: 'Allow Event Counter to send reminders',
                       trailing: FilledButton(
                         onPressed: () async {
                           await notificationService.requestPermissions();

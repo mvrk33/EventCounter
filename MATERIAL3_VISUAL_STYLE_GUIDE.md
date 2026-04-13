@@ -1,4 +1,4 @@
-# Material 3 Visual Style Guide for DayMark
+# Material 3 Visual Style Guide for EventCounter
 
 ## Color Palette
 

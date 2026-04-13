@@ -1,15 +1,20 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/auth_service.dart';
+import '../../../core/pin_security_service.dart';
 import '../../../core/sync_service.dart';
 import '../../events/providers/events_provider.dart';
 import '../../events/services/export_service.dart';
 import 'account_screen.dart';
 
-final StateProvider<ThemeMode> themeModeProvider = StateProvider<ThemeMode>((Ref ref) {
+final StateProvider<ThemeMode> themeModeProvider =
+    StateProvider<ThemeMode>((Ref ref) {
   return ThemeMode.system;
 });
 
@@ -22,6 +27,16 @@ class SettingsScreen extends ConsumerStatefulWidget {
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   final ExportService _exportService = const ExportService();
+  int _developerTapCount = 0;
+  Timer? _developerTapReset;
+
+  static final Uri _githubUri = Uri.parse('https://github.com/mvrk33');
+
+  @override
+  void dispose() {
+    _developerTapReset?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -29,6 +44,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final AsyncValue<User?> authState = ref.watch(authStateChangesProvider);
     final SyncService syncService = ref.read(syncServiceProvider);
     final events = ref.watch(eventsProvider);
+    final PinSecurityService pinSecurity = ref.read(pinSecurityServiceProvider);
+    final bool localEncryptionEnabled =
+        pinSecurity.isLocalBackupEncryptionEnabled;
+    final bool cloudEncryptionEnabled =
+        pinSecurity.isCloudBackupEncryptionEnabled;
     final scheme = Theme.of(context).colorScheme;
     final user = authState.value;
     final bool isSignedIn = user != null;
@@ -65,19 +85,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             CircleAvatar(
                               radius: 26,
                               backgroundColor: scheme.primaryContainer,
-                              backgroundImage:
-                                  user?.photoURL != null && user!.photoURL!.isNotEmpty
-                                      ? NetworkImage(user.photoURL!)
-                                      : null,
-                              child: user?.photoURL == null || user!.photoURL!.isEmpty
+                              backgroundImage: user?.photoURL != null &&
+                                      user!.photoURL!.isNotEmpty
+                                  ? NetworkImage(user.photoURL!)
+                                  : null,
+                              child: user?.photoURL == null ||
+                                      user!.photoURL!.isEmpty
                                   ? Text(
                                       user?.displayName?.isNotEmpty == true
                                           ? user!.displayName![0].toUpperCase()
                                           : '👤',
                                       style: TextStyle(
-                                        fontSize: user?.displayName?.isNotEmpty == true
-                                            ? 22
-                                            : 24,
+                                        fontSize:
+                                            user?.displayName?.isNotEmpty ==
+                                                    true
+                                                ? 22
+                                                : 24,
                                         color: scheme.onPrimaryContainer,
                                       ),
                                     )
@@ -114,7 +137,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               ),
                             ),
                             Icon(Icons.chevron_right_rounded,
-                                color: scheme.onSurface.withValues(alpha: 0.35)),
+                                color:
+                                    scheme.onSurface.withValues(alpha: 0.35)),
                           ],
                         ),
                       ),
@@ -170,7 +194,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               ),
                               ButtonSegment<ThemeMode>(
                                 value: ThemeMode.system,
-                                icon: Icon(Icons.brightness_auto_rounded, size: 16),
+                                icon: Icon(Icons.brightness_auto_rounded,
+                                    size: 16),
                               ),
                               ButtonSegment<ThemeMode>(
                                 value: ThemeMode.dark,
@@ -202,8 +227,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             ? null
                             : () async {
                                 final file =
-                                    await _exportService.exportEventsJson(events);
-                                await Share.shareXFiles(<XFile>[XFile(file.path)]);
+                                    await _exportService.exportEventsJson(
+                                  events,
+                                  security: pinSecurity,
+                                );
+                                await Share.shareXFiles(
+                                    <XFile>[XFile(file.path)]);
                               },
                         child: const Text('Export'),
                       ),
@@ -218,9 +247,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         onPressed: events.isEmpty
                             ? null
                             : () async {
-                                final file =
-                                    await _exportService.exportEventsCsv(events);
-                                await Share.shareXFiles(<XFile>[XFile(file.path)]);
+                                final file = await _exportService
+                                    .exportEventsCsv(events);
+                                await Share.shareXFiles(
+                                    <XFile>[XFile(file.path)]);
                               },
                         child: const Text('Export'),
                       ),
@@ -233,8 +263,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       subtitle: 'Restore a backup file',
                       trailing: OutlinedButton(
                         onPressed: () async {
-                          final imported =
-                              await _exportService.importEventsJsonFromDefaultFile();
+                          final imported = await _exportService
+                              .importEventsJsonFromDefaultFile(
+                            security: pinSecurity,
+                          );
                           if (imported.isEmpty) {
                             if (mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
@@ -250,12 +282,44 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           if (mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
-                                  content:
-                                      Text('Imported ${imported.length} events.')),
+                                  content: Text(
+                                      'Imported ${imported.length} events.')),
                             );
                           }
                         },
                         child: const Text('Import'),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                _SectionHeader(label: 'SECURITY'),
+                const SizedBox(height: 8),
+                _SettingsGroup(
+                  children: <Widget>[
+                    _SettingsRow(
+                      icon: Icons.lock_rounded,
+                      iconColor: const Color(0xFF5E35B1),
+                      title: 'Encrypt local backup file',
+                      subtitle:
+                          'Protects exported JSON backup in app documents',
+                      trailing: Switch(
+                        value: localEncryptionEnabled,
+                        onChanged: (bool value) =>
+                            _setLocalBackupEncryption(value),
+                      ),
+                    ),
+                    _SettingsDivider(),
+                    _SettingsRow(
+                      icon: Icons.storage_rounded,
+                      iconColor: const Color(0xFF00897B),
+                      title: 'Encrypt cloud backup sync',
+                      subtitle:
+                          'Encrypts event/habit payloads before upload to cloud',
+                      trailing: Switch(
+                        value: cloudEncryptionEnabled,
+                        onChanged: (bool value) =>
+                            _setCloudBackupEncryption(value),
                       ),
                     ),
                   ],
@@ -269,7 +333,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       icon: Icons.info_outline_rounded,
                       iconColor: scheme.primary,
                       title: 'Version',
-                      subtitle: 'DayMark v1.0.0',
+                      subtitle: 'Event Counter v1.0.0',
                     ),
                     _SettingsDivider(),
                     _SettingsRow(
@@ -280,13 +344,27 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     ),
                     _SettingsDivider(),
                     InkWell(
-                      onTap: () {},
+                      onTap: _openGithub,
                       child: _SettingsRow(
                         icon: Icons.code_rounded,
                         iconColor: const Color(0xFF37474F),
                         title: 'Open source',
                         subtitle: 'View on GitHub',
                         trailing: Icon(Icons.open_in_new_rounded,
+                            size: 16,
+                            color: scheme.onSurface.withValues(alpha: 0.4)),
+                      ),
+                    ),
+                    _SettingsDivider(),
+                    InkWell(
+                      onTap: _handleDeveloperTap,
+                      onLongPress: _openGithub,
+                      child: _SettingsRow(
+                        icon: Icons.person_rounded,
+                        iconColor: const Color(0xFF6D4C41),
+                        title: 'Developer',
+                        subtitle: 'venkata rajesh murala',
+                        trailing: Icon(Icons.celebration_rounded,
                             size: 16,
                             color: scheme.onSurface.withValues(alpha: 0.4)),
                       ),
@@ -305,6 +383,79 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   String _formatDate(DateTime dt) {
     final d = dt.toLocal();
     return '${d.month}/${d.day} ${d.hour}:${d.minute.toString().padLeft(2, '0')}';
+  }
+
+  Future<void> _openGithub() async {
+    final bool launched = await launchUrl(
+      _githubUri,
+      mode: LaunchMode.externalApplication,
+    );
+    if (!launched && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to open GitHub link right now.')),
+      );
+    }
+  }
+
+  void _handleDeveloperTap() {
+    _developerTapReset?.cancel();
+    _developerTapReset = Timer(const Duration(seconds: 5), () {
+      _developerTapCount = 0;
+    });
+    _developerTapCount += 1;
+
+    if (_developerTapCount == 4) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Easter egg: You found the hidden streak spark!')),
+      );
+      return;
+    }
+    if (_developerTapCount >= 6) {
+      _developerTapCount = 0;
+      showDialog<void>(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: const Text('Secret unlocked'),
+          content: const Text(
+              'Event Counter dev mode says: Keep shipping tiny wins daily.'),
+          actions: <Widget>[
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Nice'),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
+  Future<void> _setLocalBackupEncryption(bool enabled) async {
+    final PinSecurityService pinSecurity = ref.read(pinSecurityServiceProvider);
+    await pinSecurity.setLocalBackupEncryptionEnabled(enabled);
+    if (mounted) {
+      setState(() {});
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text(enabled
+                ? 'Local backup encryption enabled.'
+                : 'Local backup encryption disabled.')),
+      );
+    }
+  }
+
+  Future<void> _setCloudBackupEncryption(bool enabled) async {
+    final PinSecurityService pinSecurity = ref.read(pinSecurityServiceProvider);
+    await pinSecurity.setCloudBackupEncryptionEnabled(enabled);
+    if (mounted) {
+      setState(() {});
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text(enabled
+                ? 'Cloud backup encryption enabled.'
+                : 'Cloud backup encryption disabled.')),
+      );
+    }
   }
 }
 
@@ -380,7 +531,8 @@ class _SettingsDivider extends StatelessWidget {
       indent: 56,
       endIndent: 0,
       height: 1,
-      color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.4),
+      color:
+          Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.4),
     );
   }
 }

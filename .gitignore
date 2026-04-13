@@ -10,6 +10,8 @@ build/
 # IDE
 .idea/
 .vscode/
+.run/
+*.iml
 
 # Firebase secrets
 android/app/google-services.json
@@ -19,3 +21,34 @@ lib/firebase_options.dart
 # OS
 .DS_Store
 Thumbs.db
+
+# Logs and local diagnostics
+*.log
+build_log.txt
+
+# Environment files
+.env
+.env.*
+*.env
+
+# Internal planning / AI context docs (exclude from public repo)
+CODE_CHANGES_REFERENCE.md
+CRASH_FIXES_REPORT.md
+DELIVERABLES.md
+DOCUMENTATION_INDEX.md
+IMPLEMENTATION_CHECKLIST.md
+MATERIAL3_DOCUMENTATION_INDEX.md
+MATERIAL3_GUIDE.md
+MATERIAL3_IMPLEMENTATION_CHECKLIST.md
+MATERIAL3_IMPLEMENTATION_COMPLETE.md
+MATERIAL3_QUICK_REFERENCE.md
+MATERIAL3_README.md
+MATERIAL3_SUMMARY.md
+MATERIAL3_VISUAL_STYLE_GUIDE.md
+NEXT_STEPS.md
+PROJECT_COMPLETION_REPORT.md
+VERIFICATION_REPORT.md
+WIDGET_IMPLEMENTATION_GUIDE.md
+WIDGET_REFACTOR_SUMMARY.md
+WIDGET_TESTING_CHECKLIST.md
+

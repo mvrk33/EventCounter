@@ -1,14 +1,14 @@
-# 📋 DayMark Documentation Index
+# 📋 EventCounter Documentation Index
 
 **Status:** ✅ Production Ready  
 **Last Updated:** April 11, 2026  
-**Project:** DayMark - Day Counter & Tracker
+**Project:** EventCounter - Day Counter & Tracker
 
 ---
 
 ## 📚 Documentation Overview
 
-This directory contains comprehensive documentation for the DayMark Flutter project.
+This directory contains comprehensive documentation for the EventCounter Flutter project.
 Choose the right document based on your needs:
 
 ---
@@ -391,7 +391,7 @@ For best results, read in this order:
 
 ## 🌟 PROJECT HIGHLIGHTS
 
-Your DayMark project includes:
+Your EventCounter project includes:
 
 ✅ **Complete feature set** - Everything specified
 ✅ **Production code** - 5000+ quality lines
@@ -407,7 +407,7 @@ Your DayMark project includes:
 
 ## ✨ FINAL NOTES
 
-Your DayMark application is:
+Your EventCounter application is:
 - ✅ **COMPLETE** - All features implemented
 - ✅ **TESTED** - Code quality verified
 - ✅ **DOCUMENTED** - Comprehensively explained
@@ -430,7 +430,7 @@ Your DayMark application is:
 
 ---
 
-**Happy coding! Your DayMark app is ready! 🚀**
+**Happy coding! Your EventCounter app is ready! 🚀**
 
 *Generated: April 11, 2026*  
 *Status: ✅ Production Ready*  

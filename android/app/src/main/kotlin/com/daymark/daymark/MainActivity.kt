@@ -14,7 +14,7 @@ class MainActivity : FlutterActivity() {
 
         MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
-            "daymark/widget_actions"
+            "event_counter/widget_actions"
         ).setMethodCallHandler { call, result ->
             when (call.method) {
                 "pinWidget" -> result.success(requestPinWidget(this))
@@ -28,7 +28,7 @@ class MainActivity : FlutterActivity() {
             return false
         }
         val appWidgetManager = context.getSystemService(AppWidgetManager::class.java)
-        val provider = ComponentName(context, DayMarkWidgetProvider::class.java)
+        val provider = ComponentName(context, EventCounterWidgetProvider::class.java)
 
         if (!appWidgetManager.isRequestPinAppWidgetSupported) {
             return false
