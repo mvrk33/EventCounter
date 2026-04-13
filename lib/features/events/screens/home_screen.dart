@@ -133,7 +133,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final DateTime now = DateTime.now();
     final DateTime today = DateTime(now.year, now.month, now.day);
     final int thisWeekCount = events.where((e) {
-      final d = DateTime(e.date.year, e.date.month, e.date.day);
+      // Use nextOccurrenceDate for recurring events to get the actual upcoming date
+      final d = DateTime(e.nextOccurrenceDate.year, e.nextOccurrenceDate.month, e.nextOccurrenceDate.day);
       return d.difference(today).inDays <= 7 && !d.isBefore(today);
     }).length;
 
@@ -602,8 +603,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   String _bucketFor(EventModel event) {
     final DateTime now = DateTime.now();
     final DateTime today = DateTime(now.year, now.month, now.day);
+    // Use nextOccurrenceDate for recurring events to get the actual upcoming date
     final DateTime eventDay =
-        DateTime(event.date.year, event.date.month, event.date.day);
+        DateTime(event.nextOccurrenceDate.year, event.nextOccurrenceDate.month, event.nextOccurrenceDate.day);
 
     if (event.mode == EventMode.countup || eventDay.isBefore(today)) {
       return '⏳  Past & Count Up';

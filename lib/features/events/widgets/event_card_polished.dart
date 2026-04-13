@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 
 import '../models/event_model.dart';
 import '../../../shared/utils/date_helpers.dart';
@@ -33,15 +32,13 @@ class EventCardPolished extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final int value = DateHelpers.eventCountValue(event);
-    final String compactDescription =
-        DateHelpers.eventCountCompactDescription(event);
+    final String compactDescription = DateHelpers.eventCountCompactDescription(event);
     final String fullDescription = DateHelpers.eventCountDescription(event);
     final Color accent = Color(event.color);
     final bool comfortable = density == EventCardDensity.comfortable;
 
     return Container(
-      margin:
-          EdgeInsets.symmetric(horizontal: 16, vertical: comfortable ? 8 : 5),
+      margin: EdgeInsets.symmetric(horizontal: 16, vertical: comfortable ? 8 : 5),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
@@ -92,8 +89,7 @@ class EventCardPolished extends StatelessWidget {
                 ),
                 // ── Main content ──────────────────────────────────────────
                 Padding(
-                  padding:
-                      EdgeInsets.fromLTRB(14, comfortable ? 16 : 14, 6, 14),
+                  padding: EdgeInsets.fromLTRB(14, comfortable ? 16 : 14, 6, 14),
                   child: comfortable
                       ? _buildComfortableLayout(
                           context,
@@ -107,6 +103,7 @@ class EventCardPolished extends StatelessWidget {
                           accent,
                           value,
                           compactDescription,
+                          scheme,
                         ),
                 ),
               ],
@@ -154,36 +151,18 @@ class EventCardPolished extends StatelessWidget {
                       if (event.isPinned)
                         Padding(
                           padding: const EdgeInsets.only(left: 4),
-                          child: Icon(Icons.push_pin_rounded,
-                              size: 15, color: accent),
+                          child: Icon(Icons.push_pin_rounded, size: 15, color: accent),
                         ),
                     ],
                   ),
                   const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 6,
-                    children: <Widget>[
-                      _buildInfoChip(context, accent, event.category),
-                      _buildInfoChip(
-                        context,
-                        scheme.onSurface.withValues(alpha: 0.55),
-                        DateFormat('EEE, MMM d, y').format(event.date),
-                      ),
-                      if (event.recurrence != EventRecurrence.once)
-                        _buildInfoChip(
-                          context,
-                          accent.withValues(alpha: 0.8),
-                          event.recurrence.label,
-                        ),
-                    ],
-                  ),
+                  // ── Next occurrence info ──────────────────────────────────
+                  _buildNextOccurrenceInfo(context, scheme, accent),
                 ],
               ),
             ),
             const SizedBox(width: 8),
-            _buildCountBadge(context, accent, value, compactDescription,
-                large: true),
+            _buildCountBadge(context, accent, value, compactDescription, large: true),
           ],
         ),
         if (event.notes.trim().isNotEmpty) ...<Widget>[
@@ -224,6 +203,7 @@ class EventCardPolished extends StatelessWidget {
     Color accent,
     int value,
     String compactDescription,
+    ColorScheme scheme,
   ) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -251,37 +231,18 @@ class EventCardPolished extends StatelessWidget {
                   if (event.isPinned)
                     Padding(
                       padding: const EdgeInsets.only(left: 4),
-                      child:
-                          Icon(Icons.push_pin_rounded, size: 14, color: accent),
+                      child: Icon(Icons.push_pin_rounded, size: 14, color: accent),
                     ),
                 ],
               ),
               const SizedBox(height: 4),
-              Row(
-                children: <Widget>[
-                  _buildInfoChip(context, accent, event.category),
-                  const SizedBox(width: 6),
-                  Flexible(
-                    child: Text(
-                      DateFormat('MMM d, y').format(event.date),
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Theme.of(context)
-                                .colorScheme
-                                .onSurface
-                                .withValues(alpha: 0.50),
-                          ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              ),
+              // ── Next occurrence info ──────────────────────────────────
+              _buildNextOccurrenceInfoCompact(context, scheme, accent),
             ],
           ),
         ),
         const SizedBox(width: 6),
-        _buildCountBadge(context, accent, value, compactDescription,
-            large: false),
+        _buildCountBadge(context, accent, value, compactDescription, large: false),
         _buildShareButton(context),
         _buildMenuButton(context),
       ],
@@ -296,27 +257,7 @@ class EventCardPolished extends StatelessWidget {
         color: accent.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(16),
       ),
-      child: Center(
-          child: Text(event.emoji, style: TextStyle(fontSize: emojiSize))),
-    );
-  }
-
-  Widget _buildInfoChip(BuildContext context, Color color, String label) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(
-        label,
-        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              fontWeight: FontWeight.w700,
-              color: color,
-            ),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
+      child: Center(child: Text(event.emoji, style: TextStyle(fontSize: emojiSize))),
     );
   }
 
@@ -333,8 +274,7 @@ class EventCardPolished extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.end,
       children: <Widget>[
         Container(
-          padding: EdgeInsets.symmetric(
-              horizontal: large ? 13 : 11, vertical: large ? 7 : 6),
+          padding: EdgeInsets.symmetric(horizontal: large ? 13 : 11, vertical: large ? 7 : 6),
           decoration: BoxDecoration(
             color: accent.withValues(alpha: 0.11),
             borderRadius: BorderRadius.circular(12),
@@ -345,8 +285,7 @@ class EventCardPolished extends StatelessWidget {
           ),
           child: Text(
             '$value',
-            style: (large ? textTheme.headlineSmall : textTheme.titleLarge)
-                ?.copyWith(
+            style: (large ? textTheme.headlineSmall : textTheme.titleLarge)?.copyWith(
               color: accent,
               fontWeight: FontWeight.w800,
               height: 1.1,
@@ -357,8 +296,7 @@ class EventCardPolished extends StatelessWidget {
         Text(
           compactDescription,
           style: textTheme.labelSmall?.copyWith(
-            color:
-                Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.50),
+            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.50),
           ),
         ),
       ],
@@ -418,8 +356,7 @@ class EventCardPolished extends StatelessWidget {
           value: 'delete',
           child: Row(
             children: <Widget>[
-              const Icon(Icons.delete_outline_rounded,
-                  size: 16, color: Colors.red),
+              const Icon(Icons.delete_outline_rounded, size: 16, color: Colors.red),
               const SizedBox(width: 12),
               const Text('Delete', style: TextStyle(color: Colors.red)),
             ],
@@ -433,6 +370,89 @@ class EventCardPolished extends StatelessWidget {
       ),
       padding: const EdgeInsets.all(6),
       constraints: const BoxConstraints(),
+    );
+  }
+
+  Widget _buildNextOccurrenceInfo(
+    BuildContext context,
+    ColorScheme scheme,
+    Color accent,
+  ) {
+    final DateTime now = DateTime.now();
+    final DateTime nextOccurrence = event.nextOccurrenceDate;
+    final DateTime today = DateTime(now.year, now.month, now.day);
+    final DateTime nextDate =
+        DateTime(nextOccurrence.year, nextOccurrence.month, nextOccurrence.day);
+
+    // Calculate days since last occurrence and days until next
+    final int daysSince = DateHelpers.daysBetween(event.date, now).abs();
+    final int daysUntil = DateHelpers.daysBetween(now, nextOccurrence).abs();
+
+    String info;
+    if (nextDate.isBefore(today)) {
+      // Past event, show days since
+      info = '$daysSince days since';
+    } else if (DateHelpers.sameDay(nextDate, today)) {
+      // Today
+      info = 'Today';
+    } else {
+      // Future event, show days until
+      info = '$daysUntil days to go';
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: accent.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Text(
+        info,
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: accent.withValues(alpha: 0.9),
+            ),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+    );
+  }
+
+  Widget _buildNextOccurrenceInfoCompact(
+    BuildContext context,
+    ColorScheme scheme,
+    Color accent,
+  ) {
+    final DateTime now = DateTime.now();
+    final DateTime nextOccurrence = event.nextOccurrenceDate;
+    final DateTime today = DateTime(now.year, now.month, now.day);
+    final DateTime nextDate =
+        DateTime(nextOccurrence.year, nextOccurrence.month, nextOccurrence.day);
+
+    // Calculate days since last occurrence and days until next
+    final int daysSince = DateHelpers.daysBetween(event.date, now).abs();
+    final int daysUntil = DateHelpers.daysBetween(now, nextOccurrence).abs();
+
+    String info;
+    if (nextDate.isBefore(today)) {
+      // Past event, show days since
+      info = '$daysSince days since';
+    } else if (DateHelpers.sameDay(nextDate, today)) {
+      // Today
+      info = 'Today';
+    } else {
+      // Future event, show days until
+      info = '$daysUntil days to go';
+    }
+
+    return Text(
+      info,
+      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: accent.withValues(alpha: 0.8),
+            fontWeight: FontWeight.w600,
+          ),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
     );
   }
 }
