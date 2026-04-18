@@ -479,27 +479,88 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     if (_developerTapCount == 4) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text('Easter egg: You found the hidden streak spark!')),
+            behavior: SnackBarBehavior.floating,
+            content: Text('✨ You are 3 taps away from the matrix...')),
       );
       return;
     }
-    if (_developerTapCount >= 6) {
+
+    if (_developerTapCount >= 7) {
       _developerTapCount = 0;
-      showDialog<void>(
-        context: context,
-        builder: (_) => AlertDialog(
-          title: const Text('Secret unlocked'),
-          content: const Text(
-              'Event Counter dev mode says: Keep shipping tiny wins daily.'),
-          actions: <Widget>[
-            FilledButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Nice'),
+      _developerTapReset?.cancel();
+      _showDeveloperSpecial();
+    }
+  }
+
+  void _showDeveloperSpecial() {
+    final scheme = Theme.of(context).colorScheme;
+    showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+        title: Row(
+          children: [
+            Icon(Icons.terminal_rounded, color: scheme.primary),
+            const SizedBox(width: 12),
+            const Text('Dev Protocol 101'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Welcome, Architect.',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            _devInfoRow(Icons.fingerprint, 'Environment', 'Production-Gold'),
+            _devInfoRow(Icons.code, 'Engine', 'Flutter 3.22.0'),
+            _devInfoRow(Icons.storage, 'Local DB', 'Hive v2.0.1'),
+            const SizedBox(height: 16),
+            Text(
+              '“The best way to predict the future is to invent it.”',
+              style: TextStyle(
+                fontStyle: FontStyle.italic,
+                color: scheme.onSurface.withValues(alpha: 0.6),
+                fontSize: 12,
+              ),
             ),
           ],
         ),
-      );
-    }
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Back to Reality'),
+          ),
+          FilledButton.tonal(
+            onPressed: () {
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Haptic feedback calibration initialized...')),
+              );
+              HapticFeedback.heavyImpact();
+            },
+            child: const Text('Initiate Pulse'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _devInfoRow(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Icon(icon, size: 14, color: Colors.grey),
+          const SizedBox(width: 8),
+          Text('$label:', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+          const SizedBox(width: 4),
+          Text(value, style: const TextStyle(fontSize: 12, color: Colors.blueGrey)),
+        ],
+      ),
+    );
   }
 
   Future<void> _setAppLock(bool enabled) async {

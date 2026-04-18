@@ -57,6 +57,11 @@ class EventFields {
   static const String updatedAt = 'updatedAt';
   static const String recurrence = 'recurrence';
   static const String liveNotification = 'liveNotification';
+  static const String mood = 'mood';
+  static const String checklist = 'checklist';
+  static const String requiresTravel = 'requiresTravel';
+  static const String visualTheme = 'visualTheme';
+  static const String durationMinutes = 'durationMinutes';
 }
 
 class EventModel {
@@ -76,6 +81,11 @@ class EventModel {
     required this.updatedAt,
     this.recurrence = EventRecurrence.once,
     this.liveNotification = false,
+    this.mood,
+    this.checklist = const <String>[],
+    this.requiresTravel = false,
+    this.visualTheme,
+    this.duration,
   });
 
   final String id;
@@ -94,6 +104,21 @@ class EventModel {
   final EventRecurrence recurrence;
   /// Whether this event shows a persistent live-progress notification.
   final bool liveNotification;
+
+  /// Predicted mood or energy level (e.g. "High Energy", "Low Energy").
+  final String? mood;
+
+  /// A list of tasks recommended for this type of event.
+  final List<String> checklist;
+
+  /// Whether this event likely requires travel time.
+  final bool requiresTravel;
+
+  /// A keyword or key for an AI-generated or curated background theme.
+  final String? visualTheme;
+
+  /// Predicted length of the event.
+  final Duration? duration;
 
   /// For recurring events returns the next future occurrence of this date.
   /// For one-time events returns [date] unchanged.
@@ -145,6 +170,11 @@ class EventModel {
     DateTime? updatedAt,
     EventRecurrence? recurrence,
     bool? liveNotification,
+    String? mood,
+    List<String>? checklist,
+    bool? requiresTravel,
+    String? visualTheme,
+    Duration? duration,
   }) {
     return EventModel(
       id: id ?? this.id,
@@ -162,6 +192,11 @@ class EventModel {
       updatedAt: updatedAt ?? this.updatedAt,
       recurrence: recurrence ?? this.recurrence,
       liveNotification: liveNotification ?? this.liveNotification,
+      mood: mood ?? this.mood,
+      checklist: checklist ?? this.checklist,
+      requiresTravel: requiresTravel ?? this.requiresTravel,
+      visualTheme: visualTheme ?? this.visualTheme,
+      duration: duration ?? this.duration,
     );
   }
 
@@ -182,6 +217,11 @@ class EventModel {
       EventFields.updatedAt: updatedAt,
       EventFields.recurrence: recurrence.name,
       EventFields.liveNotification: liveNotification,
+      EventFields.mood: mood,
+      EventFields.checklist: checklist,
+      EventFields.requiresTravel: requiresTravel,
+      EventFields.visualTheme: visualTheme,
+      EventFields.durationMinutes: duration?.inMinutes,
     };
   }
 
@@ -202,6 +242,11 @@ class EventModel {
       EventFields.updatedAt: Timestamp.fromDate(updatedAt),
       EventFields.recurrence: recurrence.name,
       EventFields.liveNotification: liveNotification,
+      EventFields.mood: mood,
+      EventFields.checklist: checklist,
+      EventFields.requiresTravel: requiresTravel,
+      EventFields.visualTheme: visualTheme,
+      EventFields.durationMinutes: duration?.inMinutes,
     };
   }
 
@@ -222,6 +267,11 @@ class EventModel {
       EventFields.updatedAt: updatedAt.toIso8601String(),
       EventFields.recurrence: recurrence.name,
       EventFields.liveNotification: liveNotification,
+      EventFields.mood: mood,
+      EventFields.checklist: checklist,
+      EventFields.requiresTravel: requiresTravel,
+      EventFields.visualTheme: visualTheme,
+      EventFields.durationMinutes: duration?.inMinutes,
     };
   }
 
@@ -248,6 +298,16 @@ class EventModel {
       updatedAt: _parseDate(map[EventFields.updatedAt]),
       recurrence: _parseRecurrence(map[EventFields.recurrence]),
       liveNotification: (map[EventFields.liveNotification] as bool?) ?? false,
+      mood: map[EventFields.mood]?.toString(),
+      checklist: (map[EventFields.checklist] as List<dynamic>?)
+              ?.map((dynamic e) => e.toString())
+              .toList() ??
+          const <String>[],
+      requiresTravel: (map[EventFields.requiresTravel] as bool?) ?? false,
+      visualTheme: map[EventFields.visualTheme]?.toString(),
+      duration: map[EventFields.durationMinutes] != null
+          ? Duration(minutes: (map[EventFields.durationMinutes] as num).toInt())
+          : null,
     );
   }
 
@@ -322,13 +382,20 @@ class EventModelAdapter extends TypeAdapter<EventModel> {
           : EventRecurrence.values[fields[13] as int],
       // field 14 added in v3 – default false for older records
       liveNotification: (fields[14] as bool?) ?? false,
+      mood: fields[15] as String?,
+      checklist: (fields[16] as List?)?.cast<String>() ?? const <String>[],
+      requiresTravel: (fields[17] as bool?) ?? false,
+      visualTheme: fields[18] as String?,
+      duration: fields[19] == null
+          ? null
+          : Duration(minutes: fields[19] as int),
     );
   }
 
   @override
   void write(BinaryWriter writer, EventModel obj) {
     writer
-      ..writeByte(15) // total fields
+      ..writeByte(20) // total fields
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -358,6 +425,16 @@ class EventModelAdapter extends TypeAdapter<EventModel> {
       ..writeByte(13)
       ..write(obj.recurrence.index)
       ..writeByte(14)
-      ..write(obj.liveNotification);
+      ..write(obj.liveNotification)
+      ..writeByte(15)
+      ..write(obj.mood)
+      ..writeByte(16)
+      ..write(obj.checklist)
+      ..writeByte(17)
+      ..write(obj.requiresTravel)
+      ..writeByte(18)
+      ..write(obj.visualTheme)
+      ..writeByte(19)
+      ..write(obj.duration?.inMinutes);
   }
 }

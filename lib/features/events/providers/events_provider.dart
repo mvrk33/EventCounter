@@ -98,6 +98,11 @@ class EventsNotifier extends StateNotifier<List<EventModel>> {
     required EventCountUnit countUnit,
     EventRecurrence recurrence = EventRecurrence.once,
     bool liveNotification = false,
+    String? mood,
+    List<String> checklist = const <String>[],
+    bool requiresTravel = false,
+    String? visualTheme,
+    Duration? duration,
   }) async {
     final DateTime now = DateTime.now();
     final EventMode mode = date.isAfter(now) ? EventMode.countdown : EventMode.countup;
@@ -114,6 +119,11 @@ class EventsNotifier extends StateNotifier<List<EventModel>> {
       countUnit: countUnit,
       recurrence: recurrence,
       liveNotification: liveNotification,
+      mood: mood,
+      checklist: checklist,
+      requiresTravel: requiresTravel,
+      visualTheme: visualTheme,
+      duration: duration,
       createdAt: now,
       updatedAt: now,
     );

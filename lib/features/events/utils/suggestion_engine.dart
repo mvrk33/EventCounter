@@ -89,6 +89,36 @@ class SuggestionEngine {
       mood = 'Low Energy';
     }
 
+    // Smart Preparation Checklists
+    final List<String> checklist = <String>[];
+    if (top.categoryId == 'Travel' || lowerTitle.contains('trip') || lowerTitle.contains('flight')) {
+      checklist.addAll(['Passport', 'Charger', 'Toiletries', 'Tickets']);
+    } else if (top.categoryId == 'Birthday' || lowerTitle.contains('birthday')) {
+      checklist.addAll(['Buy gift', 'Order cake', 'Send invites']);
+    } else if (top.categoryId == 'Work' || lowerTitle.contains('meeting')) {
+      checklist.addAll(['Prepare agenda', 'Take notes', 'Follow up']);
+    }
+
+    // Smart Time-to-Leave & Travel
+    final bool requiresTravel = top.categoryId == 'Travel' ||
+        RegExp(r'coffee|dinner|meeting|gym|concert|party|airport|office').hasMatch(lowerTitle);
+
+    // AI-Generated Visual Theme keyword
+    String? visualTheme;
+    if (lowerTitle.contains('beach')) visualTheme = 'ocean_waves';
+    if (lowerTitle.contains('forest') || lowerTitle.contains('hike')) visualTheme = 'pine_trees';
+    if (lowerTitle.contains('coffee')) visualTheme = 'coffee_steam';
+
+    // Time-Block Prediction
+    Duration? suggestedDuration;
+    if (RegExp(r'meeting|call|coffee').hasMatch(lowerTitle)) {
+      suggestedDuration = const Duration(minutes: 30);
+    } else if (RegExp(r'movie|concert|dinner|party').hasMatch(lowerTitle)) {
+      suggestedDuration = const Duration(hours: 2, minutes: 30);
+    } else if (RegExp(r'gym|workout|run').hasMatch(lowerTitle)) {
+      suggestedDuration = const Duration(hours: 1);
+    }
+
     return SuggestionResult(
       primaryCategory: top.categoryId,
       secondaryLabels: secondary.toList(growable: false),
@@ -102,6 +132,10 @@ class SuggestionEngine {
       suggestedDate: suggestedDate,
       suggestedMood: mood,
       cleanedTitle: cleanedTitle,
+      suggestedChecklist: checklist,
+      requiresTravel: requiresTravel,
+      suggestedVisualTheme: visualTheme,
+      suggestedDuration: suggestedDuration,
       confidence: topScore,
       isAmbiguous: isAmbiguous,
       disambiguationOptions: disambig,

@@ -34,6 +34,13 @@ class _AddEditEventScreenState extends ConsumerState<AddEditEventScreen> {
   late EventRecurrence _recurrence;
   late bool _liveNotification;
 
+  // New Smart Fields
+  late String? _mood;
+  late List<String> _checklist;
+  late bool _requiresTravel;
+  late String? _visualTheme;
+  late Duration? _duration;
+
   SuggestionResult? _pendingSuggestion;
   bool _advancedOpen = false;
   bool _suggestionDismissed = false;
@@ -76,6 +83,13 @@ class _AddEditEventScreenState extends ConsumerState<AddEditEventScreen> {
     _countUnit = e?.countUnit ?? EventCountUnit.days;
     _recurrence = e?.recurrence ?? EventRecurrence.once;
     _liveNotification = e?.liveNotification ?? false;
+
+    _mood = e?.mood;
+    _checklist = List<String>.from(e?.checklist ?? <String>[]);
+    _requiresTravel = e?.requiresTravel ?? false;
+    _visualTheme = e?.visualTheme;
+    _duration = e?.duration;
+
     _titleController.addListener(_onTitleChanged);
     _refreshNotificationPermissionState();
   }
@@ -103,7 +117,14 @@ class _AddEditEventScreenState extends ConsumerState<AddEditEventScreen> {
 
       final SuggestionResult? result =
           SuggestionEngine.analyze(_titleController.text);
-      setState(() => _pendingSuggestion = result);
+      setState(() {
+        _pendingSuggestion = result;
+        // ── Smart Title Cleaning (Nudge) ─────────────────────────────
+        if (result?.cleanedTitle != null &&
+            result?.cleanedTitle != _titleController.text.trim()) {
+          // We don't auto-replace, but we'll show it in the banner
+        }
+      });
     });
   }
 
@@ -121,6 +142,18 @@ class _AddEditEventScreenState extends ConsumerState<AddEditEventScreen> {
       }
       if (s.suggestedReminderDays.isNotEmpty) {
         _reminderDays = List<int>.from(s.suggestedReminderDays);
+      }
+
+      // ── Apply New Smart Fields ──────────────────────────────────
+      _mood = s.suggestedMood;
+      _checklist = List<String>.from(s.suggestedChecklist);
+      _requiresTravel = s.requiresTravel;
+      _visualTheme = s.suggestedVisualTheme;
+      _duration = s.suggestedDuration;
+
+      // ── Apply Cleaned Title ──────────────────────────────────────
+      if (s.cleanedTitle != null) {
+        _titleController.text = s.cleanedTitle!;
       }
       _pendingSuggestion = null;
       _bannerExpanded = false;
@@ -140,8 +173,28 @@ class _AddEditEventScreenState extends ConsumerState<AddEditEventScreen> {
     final bool editing = widget.existing != null;
     final scheme = Theme.of(context).colorScheme;
 
-    return Scaffold(
-      body: CustomScrollView(
+    // ── Live Theming ────────────────────────────────────────────────
+    // Use the pending suggestion's colors if available to "preview" the theme.
+    final Color? themePrimary = _pendingSuggestion != null
+        ? Color(_pendingSuggestion!.primaryColor)
+        : null;
+    final Color? themeBg = _pendingSuggestion != null
+        ? Color(_pendingSuggestion!.bgColor).withValues(alpha: 1.0)
+        : null;
+
+    return AnimatedTheme(
+      data: Theme.of(context).copyWith(
+        colorScheme: themePrimary != null
+            ? ColorScheme.fromSeed(
+                seedColor: themePrimary,
+                brightness: scheme.brightness,
+              )
+            : null,
+      ),
+      duration: const Duration(milliseconds: 500),
+      child: Scaffold(
+        backgroundColor: themeBg,
+        body: CustomScrollView(
         slivers: [
           SliverAppBar.large(
             title: Text(
@@ -308,11 +361,13 @@ class _AddEditEventScreenState extends ConsumerState<AddEditEventScreen> {
     final Color accent = Color(s.primaryColor);
 
     // Confidence-based label
-    final String confidenceLabel = s.confidence >= 0.80
-        ? '✨ Looks like a ${s.primaryCategory}!'
-        : s.confidence >= 0.50
-            ? '💡 This might be a ${s.primaryCategory}'
-            : '🤔 Not sure — possibly ${s.primaryCategory}?';
+    final String confidenceLabel = s.isAmbiguous
+        ? '🤔 Ambiguous: ${s.primaryCategory}?'
+        : s.confidence >= 0.80
+            ? '✨ Looks like a ${s.primaryCategory}!'
+            : s.confidence >= 0.50
+                ? '💡 This might be a ${s.primaryCategory}'
+                : '🤔 Not sure — possibly ${s.primaryCategory}?';
 
     // Recurrence hint text
     final String recurrenceHint = s.suggestedRecurrence != EventRecurrence.once
@@ -397,6 +452,64 @@ class _AddEditEventScreenState extends ConsumerState<AddEditEventScreen> {
                               color: accent.withValues(alpha: 0.7),
                             ),
                           ),
+                          if (s.cleanedTitle != null) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              'Title will be: "${s.cleanedTitle}"',
+                              style: GoogleFonts.nunito(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: accent.withValues(alpha: 0.6),
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
+                          ],
+                          if (s.suggestedMood != null || s.suggestedChecklist.isNotEmpty) ...[
+                            const SizedBox(height: 2),
+                            Row(
+                              children: [
+                                if (s.suggestedMood != null) ...[
+                                  Icon(
+                                    s.suggestedMood == 'High Energy'
+                                        ? Icons.bolt_rounded
+                                        : Icons.self_improvement_rounded,
+                                    size: 12,
+                                    color: accent.withValues(alpha: 0.6),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    s.suggestedMood!,
+                                    style: GoogleFonts.nunito(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      color: accent.withValues(alpha: 0.6),
+                                    ),
+                                  ),
+                                ],
+                                if (s.suggestedMood != null && s.suggestedChecklist.isNotEmpty)
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                                    child: Text('•', style: TextStyle(color: accent.withValues(alpha: 0.4), fontSize: 10)),
+                                  ),
+                                if (s.suggestedChecklist.isNotEmpty) ...[
+                                  Icon(
+                                    Icons.checklist_rounded,
+                                    size: 12,
+                                    color: accent.withValues(alpha: 0.6),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '${s.suggestedChecklist.length} tasks',
+                                    style: GoogleFonts.nunito(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      color: accent.withValues(alpha: 0.6),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -506,6 +619,9 @@ class _AddEditEventScreenState extends ConsumerState<AddEditEventScreen> {
                               ],
                               suggestedRecurrence: s.suggestedRecurrence,
                               suggestedReminderDays: s.suggestedReminderDays,
+                              suggestedDate: s.suggestedDate,
+                              suggestedMood: s.suggestedMood,
+                              cleanedTitle: s.cleanedTitle,
                               isAmbiguous: s.isAmbiguous,
                               disambiguationOptions: s.disambiguationOptions,
                             );
@@ -514,6 +630,74 @@ class _AddEditEventScreenState extends ConsumerState<AddEditEventScreen> {
                       ),
                     )),
               ],
+            ),
+            const SizedBox(height: 10),
+          ],
+
+          // ── Disambiguation Options ──────────────────────────────────
+          if (s.isAmbiguous && s.disambiguationOptions.isNotEmpty) ...<Widget>[
+            Text(
+              'DID YOU MEAN?',
+              style: GoogleFonts.nunito(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                color: accent.withValues(alpha: 0.6),
+                letterSpacing: 0.8,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: s.disambiguationOptions.map((String option) {
+                return GestureDetector(
+                  onTap: () {
+                    // Re-analyze or just switch to the option
+                    setState(() {
+                      _pendingSuggestion = SuggestionResult(
+                        primaryCategory: option,
+                        emoji: s.emoji, // Keep or find new emoji?
+                        primaryColor: s.primaryColor,
+                        bgColor: s.bgColor,
+                        confidence: 0.9, // Boost confidence since user selected
+                        secondaryLabels: <String>[s.primaryCategory],
+                        emojiAlternatives: s.emojiAlternatives,
+                        suggestedRecurrence: s.suggestedRecurrence,
+                        suggestedReminderDays: s.suggestedReminderDays,
+                        suggestedDate: s.suggestedDate,
+                        suggestedMood: s.suggestedMood,
+                        cleanedTitle: s.cleanedTitle,
+                        isAmbiguous: false,
+                        disambiguationOptions: const <String>[],
+                      );
+                    });
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: accent.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(12),
+                      border:
+                          Border.all(color: accent.withValues(alpha: 0.5)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.help_outline_rounded, size: 14, color: accent),
+                        const SizedBox(width: 6),
+                        Text(
+                          option,
+                          style: GoogleFonts.nunito(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
+                              color: accent),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(growable: false),
             ),
             const SizedBox(height: 10),
           ],
@@ -600,6 +784,30 @@ class _AddEditEventScreenState extends ConsumerState<AddEditEventScreen> {
                   label: DateFormat('MMM d').format(s.suggestedDate!),
                   accent: accent,
                 ),
+              if (s.suggestedChecklist.isNotEmpty) ...[
+                const SizedBox(width: 6),
+                _PreviewPill(
+                  icon: Icons.checklist_rounded,
+                  label: '${s.suggestedChecklist.length} items',
+                  accent: accent,
+                ),
+              ],
+              if (s.requiresTravel) ...[
+                const SizedBox(width: 6),
+                _PreviewPill(
+                  icon: Icons.flight_takeoff_rounded,
+                  label: 'Travel',
+                  accent: accent,
+                ),
+              ],
+              if (s.suggestedDuration != null) ...[
+                const SizedBox(width: 6),
+                _PreviewPill(
+                  icon: Icons.access_time_rounded,
+                  label: '${s.suggestedDuration!.inMinutes}m',
+                  accent: accent,
+                ),
+              ],
             ],
           ),
         ],
@@ -1356,6 +1564,11 @@ class _AddEditEventScreenState extends ConsumerState<AddEditEventScreen> {
         countUnit: _countUnit,
         recurrence: _recurrence,
         liveNotification: _liveNotification,
+        mood: _mood,
+        checklist: _checklist,
+        requiresTravel: _requiresTravel,
+        visualTheme: _visualTheme,
+        duration: _duration,
       );
     } else {
       await notifier.updateEvent(
@@ -1373,6 +1586,11 @@ class _AddEditEventScreenState extends ConsumerState<AddEditEventScreen> {
           mode: _date.isAfter(DateTime.now())
               ? EventMode.countdown
               : EventMode.countup,
+          mood: _mood,
+          checklist: _checklist,
+          requiresTravel: _requiresTravel,
+          visualTheme: _visualTheme,
+          duration: _duration,
         ),
       );
     }

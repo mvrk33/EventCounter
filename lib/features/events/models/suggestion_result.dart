@@ -18,6 +18,10 @@ class SuggestionResult {
     this.disambiguationOptions = const <String>[],
     this.suggestedMood,
     this.cleanedTitle,
+    this.suggestedChecklist = const <String>[],
+    this.requiresTravel = false,
+    this.suggestedVisualTheme,
+    this.suggestedDuration,
   });
 
   /// The best-matching category name (e.g. "Birthday").
@@ -64,4 +68,16 @@ class SuggestionResult {
 
   /// Other candidate categories when [isAmbiguous] is true.
   final List<String> disambiguationOptions;
+
+  /// A list of tasks recommended for this type of event.
+  final List<String> suggestedChecklist;
+
+  /// Whether this event likely requires travel time.
+  final bool requiresTravel;
+
+  /// A keyword or key for an AI-generated or curated background theme.
+  final String? suggestedVisualTheme;
+
+  /// Predicted length of the event.
+  final Duration? suggestedDuration;
 }
