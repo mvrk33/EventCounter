@@ -53,215 +53,219 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen>
     final notificationService = ref.read(notificationServiceProvider);
     final scheme = Theme.of(context).colorScheme;
 
-    return CustomScrollView(
-      slivers: <Widget>[
-        // ── Header ────────────────────────────────────────────────────
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text('Alerts',
-                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: -1.0,
-                    )),
-                const SizedBox(height: 4),
-                Text(
-                  'Manage your reminders & permissions.',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: scheme.onSurface.withValues(alpha: 0.5),
-                        fontWeight: FontWeight.w600,
-                      ),
+    return Scaffold(
+      body: SafeArea(
+        child: CustomScrollView(
+          slivers: <Widget>[
+            // ── Header ────────────────────────────────────────────────────
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text('Alerts',
+                        style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: -1.0,
+                        )),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Manage your reminders & permissions.',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: scheme.onSurface.withValues(alpha: 0.5),
+                            fontWeight: FontWeight.w600,
+                          ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
-          ),
-        ),
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Column(
-              children: <Widget>[
-                // ── Permissions group ───────────────────────────────────
-                _NotifGroup(
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Column(
                   children: <Widget>[
-                    _NotifRow(
-                      icon: Icons.notifications_active_rounded,
-                      iconColor: const Color(0xFF5E6AD2),
-                      title: 'Notification permission',
-                      subtitle: _permissionStatus.isGranted
-                          ? 'Notifications are enabled ✓'
-                          : _permissionStatus.isPermanentlyDenied
-                              ? 'Permanently denied – open Settings to enable'
-                              : 'Allow Daymark to send reminders',
-                      trailing: _loadingPermission
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : _permissionStatus.isGranted
-                              ? Icon(Icons.check_circle_rounded,
-                                  color: Colors.green.shade600)
-                              : FilledButton(
-                                  onPressed: () async {
-                                    if (_permissionStatus.isPermanentlyDenied) {
-                                      await openAppSettings();
-                                    } else {
-                                      await notificationService
-                                          .requestPermissions();
-                                    }
-                                    await _refreshPermissionStatus();
-                                  },
-                                  style: FilledButton.styleFrom(
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
+                    // ── Permissions group ───────────────────────────────────
+                    _NotifGroup(
+                      children: <Widget>[
+                        _NotifRow(
+                          icon: Icons.notifications_active_rounded,
+                          iconColor: const Color(0xFF5E6AD2),
+                          title: 'Notification permission',
+                          subtitle: _permissionStatus.isGranted
+                              ? 'Notifications are enabled ✓'
+                              : _permissionStatus.isPermanentlyDenied
+                                  ? 'Permanently denied – open Settings to enable'
+                                  : 'Allow Daymark to send reminders',
+                          trailing: _loadingPermission
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : _permissionStatus.isGranted
+                                  ? Icon(Icons.check_circle_rounded,
+                                      color: Colors.green.shade600)
+                                  : FilledButton(
+                                      onPressed: () async {
+                                        if (_permissionStatus.isPermanentlyDenied) {
+                                          await openAppSettings();
+                                        } else {
+                                          await notificationService
+                                              .requestPermissions();
+                                        }
+                                        await _refreshPermissionStatus();
+                                      },
+                                      style: FilledButton.styleFrom(
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                      ),
+                                      child: Text(
+                                        _permissionStatus.isPermanentlyDenied
+                                            ? 'Settings'
+                                            : 'Allow',
+                                        style: const TextStyle(fontWeight: FontWeight.w700),
+                                      ),
                                     ),
-                                  ),
-                                  child: Text(
-                                    _permissionStatus.isPermanentlyDenied
-                                        ? 'Settings'
-                                        : 'Allow',
-                                    style: const TextStyle(fontWeight: FontWeight.w700),
-                                  ),
-                                ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 20),
-                // ── Live event notifications ──────────────────────────
-                Padding(
-                  padding: const EdgeInsets.only(left: 4, bottom: 8),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'LIVE EVENT ALERTS',
-                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                            color: scheme.primary,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 1.2,
-                          ),
-                    ),
-                  ),
-                ),
-                _NotifGroup(
-                  children: <Widget>[
-                    _NotifRow(
-                      icon: Icons.wb_sunny_rounded,
-                      iconColor: Colors.amber,
-                      title: 'Daily morning summary',
-                      subtitle: 'Get a notification at 8 AM with today\'s events',
-                      trailing: OutlinedButton(
-                        onPressed: _permissionStatus.isGranted
-                            ? () async {
-                                await notificationService
-                                    .scheduleTodayEventsNotification();
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                          'Morning summary scheduled for 8 AM ✓'),
-                                    ),
-                                  );
-                                }
-                              }
-                            : null,
-                        style: OutlinedButton.styleFrom(
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
                         ),
-                        child: const Text('Schedule', style: TextStyle(fontWeight: FontWeight.w700)),
-                      ),
+                      ],
                     ),
-                  ],
-                ),
-                const SizedBox(height: 20),
-                // ── Habit reminders group ─────────────────────────────
-                Padding(
-                  padding: const EdgeInsets.only(left: 4, bottom: 8),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'HABIT REMINDERS',
-                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                            color: scheme.primary,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 1.2,
-                          ),
-                    ),
-                  ),
-                ),
-                _NotifGroup(
-                  children: <Widget>[
-                    _NotifRow(
-                      icon: Icons.alarm_rounded,
-                      iconColor: Colors.orange,
-                      title: 'Daily habit reminder',
-                      subtitle: 'Reminder at ${_time.format(context)}',
-                      trailing: OutlinedButton(
-                        onPressed: _permissionStatus.isGranted
-                            ? () async {
-                                final TimeOfDay? selected = await showTimePicker(
-                                  context: context,
-                                  initialTime: _time,
-                                );
-                                if (selected == null) return;
-                                setState(() => _time = selected);
-                                await notificationService
-                                    .scheduleDailyHabitReminder(
-                                  hour: selected.hour,
-                                  minute: selected.minute,
-                                );
-                              }
-                            : null,
-                        style: OutlinedButton.styleFrom(
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: const Text('Change', style: TextStyle(fontWeight: FontWeight.w700)),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 20),
-                // ── Info box ──────────────────────────────────────────
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: scheme.primaryContainer.withValues(alpha: 0.3),
-                    borderRadius: BorderRadius.circular(24),
-                    border: Border.all(color: scheme.primary.withValues(alpha: 0.1)),
-                  ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      Icon(Icons.info_outline_rounded,
-                          color: scheme.primary, size: 20),
-                      const SizedBox(width: 14),
-                      Expanded(
+                    const SizedBox(height: 20),
+                    // ── Live event notifications ──────────────────────────
+                    Padding(
+                      padding: const EdgeInsets.only(left: 4, bottom: 8),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
                         child: Text(
-                          'Event reminders are also configured individually when you create or edit an event.',
-                          style:
-                              Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: scheme.onPrimaryContainer,
-                                    fontWeight: FontWeight.w600,
-                                    height: 1.4,
-                                  ),
+                          'LIVE EVENT ALERTS',
+                          style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                                color: scheme.primary,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 1.2,
+                              ),
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                    _NotifGroup(
+                      children: <Widget>[
+                        _NotifRow(
+                          icon: Icons.wb_sunny_rounded,
+                          iconColor: Colors.amber,
+                          title: 'Daily morning summary',
+                          subtitle: 'Get a notification at 8 AM with today\'s events',
+                          trailing: OutlinedButton(
+                            onPressed: _permissionStatus.isGranted
+                                ? () async {
+                                    await notificationService
+                                        .scheduleTodayEventsNotification();
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                              'Morning summary scheduled for 8 AM ✓'),
+                                        ),
+                                      );
+                                    }
+                                  }
+                                : null,
+                            style: OutlinedButton.styleFrom(
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: const Text('Schedule', style: TextStyle(fontWeight: FontWeight.w700)),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    // ── Habit reminders group ─────────────────────────────
+                    Padding(
+                      padding: const EdgeInsets.only(left: 4, bottom: 8),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          'HABIT REMINDERS',
+                          style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                                color: scheme.primary,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 1.2,
+                              ),
+                        ),
+                      ),
+                    ),
+                    _NotifGroup(
+                      children: <Widget>[
+                        _NotifRow(
+                          icon: Icons.alarm_rounded,
+                          iconColor: Colors.orange,
+                          title: 'Daily habit reminder',
+                          subtitle: 'Reminder at ${_time.format(context)}',
+                          trailing: OutlinedButton(
+                            onPressed: _permissionStatus.isGranted
+                                ? () async {
+                                    final TimeOfDay? selected = await showTimePicker(
+                                      context: context,
+                                      initialTime: _time,
+                                    );
+                                    if (selected == null) return;
+                                    setState(() => _time = selected);
+                                    await notificationService
+                                        .scheduleDailyHabitReminder(
+                                      hour: selected.hour,
+                                      minute: selected.minute,
+                                    );
+                                  }
+                                : null,
+                            style: OutlinedButton.styleFrom(
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: const Text('Change', style: TextStyle(fontWeight: FontWeight.w700)),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    // ── Info box ──────────────────────────────────────────
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: scheme.primaryContainer.withValues(alpha: 0.3),
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(color: scheme.primary.withValues(alpha: 0.1)),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          Icon(Icons.info_outline_rounded,
+                              color: scheme.primary, size: 20),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Text(
+                              'Event reminders are also configured individually when you create or edit an event.',
+                              style:
+                                  Theme.of(context).textTheme.bodySmall?.copyWith(
+                                        color: scheme.onPrimaryContainer,
+                                        fontWeight: FontWeight.w600,
+                                        height: 1.4,
+                                      ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 32),
+                  ],
                 ),
-                const SizedBox(height: 32),
-              ],
+              ),
             ),
-          ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }

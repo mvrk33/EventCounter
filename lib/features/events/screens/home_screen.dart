@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:intl/intl.dart';
 import 'package:screenshot/screenshot.dart';
@@ -97,14 +98,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     ];
 
     return Scaffold(
-      body: PageView(
-        controller: _pageController,
-        onPageChanged: (int pageIndex) {
-          setState(() {
-            _navIndex = _navIndexFromTab(pageIndex);
-          });
-        },
-        children: tabs,
+      body: SafeArea(
+        child: PageView(
+          controller: _pageController,
+          onPageChanged: (int pageIndex) {
+            setState(() {
+              _navIndex = _navIndexFromTab(pageIndex);
+            });
+          },
+          children: tabs,
+        ),
       ),
       bottomNavigationBar: BottomNav(
         currentIndex: _navIndex,
@@ -193,10 +196,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           SliverToBoxAdapter(
             child: _buildGreetingHeader(context, thisWeekCount, habits.length),
           ),
-          // ── "Next Up" spotlight ───────────────────────────────────────
-          if (nextUpEvent != null && _searchQuery.isEmpty && _selectedCategory == 'All')
+          // ── Insight Dashboard (Replaces "Next Up" spotlight) ──────────
+          if (_searchQuery.isEmpty && _selectedCategory == 'All')
             SliverToBoxAdapter(
-              child: _buildNextUpCard(context, nextUpEvent),
+              child: _buildInsightDashboard(context, nextUpEvent, habits),
             ),
           // ── Cloud sync banner (shows while initial restore runs) ──────
           if (_isSyncing)
@@ -240,167 +243,213 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  Widget _buildNextUpCard(BuildContext context, EventModel event) {
-    final scheme = Theme.of(context).colorScheme;
-    final Color accent = Color(event.color);
-    final int daysUntil = DateHelpers.daysBetween(DateTime.now(), event.nextOccurrenceDate).abs();
-    final DateTime today = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
-    final DateTime nextDate = DateTime(
-        event.nextOccurrenceDate.year, event.nextOccurrenceDate.month, event.nextOccurrenceDate.day);
-    final bool isToday = DateHelpers.sameDay(nextDate, today);
+  Widget _buildInsightDashboard(
+      BuildContext context, EventModel? nextUp, List<dynamic> habits) {
+    final events = ref.watch(eventsProvider);
+    final insights = _generateIntelligentInsights(events, habits);
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-      child: GestureDetector(
-        onTap: () => _showEventDetail(context, event),
-        child: Container(
-          height: 110,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: [
-              BoxShadow(
-                color: accent.withValues(alpha: 0.15),
-                blurRadius: 20,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(24),
+    if (insights.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      height: 180,
+      margin: const EdgeInsets.only(top: 8, bottom: 16),
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        physics: const BouncingScrollPhysics(),
+        itemCount: insights.length,
+        itemBuilder: (context, index) {
+          final insight = insights[index];
+          return _InsightCard(
+            width: insight.width,
+            gradient: insight.gradient,
+            onTap: insight.onTap,
             child: Stack(
               children: [
-                // Background Gradient
-                Positioned.fill(
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          accent.withValues(alpha: 0.15),
-                          accent.withValues(alpha: 0.05),
-                        ],
+                if (insight.backgroundEmoji != null)
+                  Positioned(
+                    right: -20,
+                    bottom: -20,
+                    child: Text(
+                      insight.backgroundEmoji!,
+                      style: TextStyle(
+                        fontSize: 100,
+                        color: Colors.white.withValues(alpha: 0.1),
                       ),
                     ),
                   ),
-                ),
-                // Glass effect pattern
-                Positioned(
-                  right: -20,
-                  top: -20,
-                  child: Container(
-                    width: 100,
-                    height: 100,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.white.withValues(alpha: 0.05),
-                    ),
-                  ),
-                ),
                 Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Row(
-                    children: <Widget>[
-                      // Left: Emoji and Info
-                      Container(
-                        width: 56,
-                        height: 56,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.8),
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.05),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _DashboardTag(label: insight.tag, icon: insight.icon),
+                      const Spacer(),
+                      Text(
+                        insight.title,
+                        style: GoogleFonts.plusJakartaSans(
+                          color: Colors.white,
+                          fontSize: insight.titleSize,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.5,
                         ),
-                        child: Center(
-                          child: Text(event.emoji, style: const TextStyle(fontSize: 28)),
-                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: <Widget>[
-                            Row(
-                              children: [
-                                Icon(Icons.auto_awesome_rounded, size: 12, color: accent),
-                                const SizedBox(width: 4),
-                                Text(
-                                  'NEXT UP',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w900,
-                                    color: accent,
-                                    letterSpacing: 1.2,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              event.title,
-                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.w800,
-                                    letterSpacing: -0.5,
-                                  ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            Text(
-                              isToday
-                                  ? 'Happening today! 🎊'
-                                  : DateFormat('EEEE, MMM d').format(event.nextOccurrenceDate),
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: scheme.onSurface.withValues(alpha: 0.6),
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                            ),
-                          ],
+                      const SizedBox(height: 4),
+                      Text(
+                        insight.subtitle,
+                        style: GoogleFonts.plusJakartaSans(
+                          color: Colors.white.withValues(alpha: 0.7),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
                         ),
-                      ),
-                      // Right: Days
-                      Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Text(
-                            isToday ? '0' : '$daysUntil',
-                            style: TextStyle(
-                              fontSize: 32,
-                              fontWeight: FontWeight.w900,
-                              color: accent,
-                              height: 1.0,
-                            ),
-                          ),
-                          Text(
-                            'days',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: accent.withValues(alpha: 0.6),
-                            ),
-                          ),
-                        ],
                       ),
                     ],
                   ),
                 ),
               ],
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }
 
+  List<_DashboardInsight> _generateIntelligentInsights(
+      List<EventModel> events, List<dynamic> habits) {
+    final List<_DashboardInsight> insights = [];
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    // 1. Next Up (Primary Insight)
+    final upcoming = events
+        .where((e) => !DateTime(e.nextOccurrenceDate.year, e.nextOccurrenceDate.month, e.nextOccurrenceDate.day).isBefore(today))
+        .toList();
+    if (upcoming.isNotEmpty) {
+      upcoming.sort((a, b) => a.nextOccurrenceDate.compareTo(b.nextOccurrenceDate));
+      final next = upcoming.first;
+      final diff = DateHelpers.daysBetween(today, next.nextOccurrenceDate).abs();
+      
+      insights.add(_DashboardInsight(
+        tag: 'COMING UP',
+        icon: Icons.auto_awesome_rounded,
+        title: next.title,
+        subtitle: diff == 0 ? 'Happening Today' : 'In $diff days',
+        gradient: [const Color(0xFF6366F1), const Color(0xFF4338CA)],
+        backgroundEmoji: next.emoji,
+        width: 280,
+        titleSize: 20,
+        onTap: () => _showEventDetail(context, next),
+      ));
+    }
+
+    // 2. High Density Day
+    final Map<DateTime, int> dayCounts = {};
+    for (final e in upcoming) {
+      final d = DateTime(e.nextOccurrenceDate.year, e.nextOccurrenceDate.month, e.nextOccurrenceDate.day);
+      dayCounts[d] = (dayCounts[d] ?? 0) + 1;
+    }
+    
+    DateTime? busyDay;
+    int maxCount = 0;
+    dayCounts.forEach((date, count) {
+      if (count > 1 && count > maxCount) {
+        maxCount = count;
+        busyDay = date;
+      }
+    });
+
+    if (busyDay != null && busyDay!.difference(today).inDays <= 14) {
+      final dayName = DateFormat('EEEE').format(busyDay!);
+      insights.add(_DashboardInsight(
+        tag: 'BUSY DAY',
+        icon: Icons.calendar_month_rounded,
+        title: '$maxCount events on $dayName',
+        subtitle: busyDay == today ? 'Better get ready!' : 'Mark your calendar',
+        gradient: [const Color(0xFFEC4899), const Color(0xFFBE185D)],
+        width: 220,
+      ));
+    }
+
+    // 3. Habit Momentum
+    if (habits.isNotEmpty) {
+      dynamic topHabit;
+      int maxStreak = 0;
+      for (final h in habits) {
+        if (h.currentStreak > maxStreak) {
+          maxStreak = h.currentStreak;
+          topHabit = h;
+        }
+      }
+      
+      if (maxStreak >= 3) {
+        insights.add(_DashboardInsight(
+          tag: 'MOMENTUM',
+          icon: Icons.local_fire_department_rounded,
+          title: '$maxStreak Day Streak',
+          subtitle: 'Keep it up with ${topHabit.title}!',
+          gradient: [const Color(0xFFF59E0B), const Color(0xFFD97706)],
+          backgroundEmoji: topHabit.emoji,
+          width: 220,
+          onTap: () => _pageController.animateToPage(1, duration: const Duration(milliseconds: 400), curve: Curves.easeOutCubic),
+        ));
+      }
+    }
+
+    // 4. Milestone Alert (Count-ups)
+    final past = events.where((e) => e.mode == EventMode.countup || e.nextOccurrenceDate.isBefore(today)).toList();
+    for (final e in past) {
+      final days = DateHelpers.daysBetween(e.date, today).abs();
+      if (days > 0 && (days % 100 == 0 || days == 365 || days == 30)) {
+        insights.add(_DashboardInsight(
+          tag: 'MILESTONE',
+          icon: Icons.emoji_events_rounded,
+          title: '$days Days Since',
+          subtitle: e.title,
+          gradient: [const Color(0xFF10B981), const Color(0xFF059669)],
+          backgroundEmoji: '🎉',
+          width: 220,
+        ));
+        break; // Just show one milestone at a time
+      }
+    }
+
+    // 5. Category Balance
+    if (events.length > 5) {
+      final Map<String, int> catCounts = {};
+      for (final e in events) {
+        catCounts[e.category] = (catCounts[e.category] ?? 0) + 1;
+      }
+      
+      String? majorCat;
+      int catMax = 0;
+      catCounts.forEach((cat, count) {
+        if (count > catMax) {
+          catMax = count;
+          majorCat = cat;
+        }
+      });
+
+      if (majorCat != null && catMax > events.length / 2) {
+        insights.add(_DashboardInsight(
+          tag: 'BALANCE',
+          icon: Icons.pie_chart_rounded,
+          title: 'Focusing on $majorCat',
+          subtitle: 'That\'s $catMax of your markers!',
+          gradient: [const Color(0xFF8B5CF6), const Color(0xFF6D28D9)],
+          width: 220,
+        ));
+      }
+    }
+
+    return insights;
+  }
+
+  // Removed _buildNextUpCard as it is replaced by _buildInsightDashboard
+
   Widget _buildGreetingHeader(
       BuildContext context, int thisWeekCount, int habitCount) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final hour = DateTime.now().hour;
 
     final String greeting;
@@ -417,85 +466,101 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final String dayStr = DateFormat('EEEE').format(DateTime.now());
     final String dateStr = DateFormat('MMMM d').format(DateTime.now());
 
-    // Pick gradient based on time of day
-    final List<Color> gradientColors;
-    if (isDark) {
-      gradientColors = [const Color(0xFF1E1E1E), const Color(0xFF2C2C2C)];
-    } else if (hour < 5) {
-      gradientColors = [const Color(0xFF0F2027), const Color(0xFF203A43), const Color(0xFF2C5364)];
-    } else if (hour < 12) {
-      gradientColors = [const Color(0xFF48c6ef), const Color(0xFF6f86d6)];
-    } else if (hour < 17) {
-      gradientColors = [const Color(0xFF00b09b), const Color(0xFF96c93d)];
-    } else {
-      gradientColors = [const Color(0xFFf857a6), const Color(0xFFff5858)];
-    }
-
     return Container(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+      padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    dayStr,
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w900,
-                      fontSize: 32,
-                      letterSpacing: -1.0,
+                    '$greeting,',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                     ),
                   ),
+                  const SizedBox(height: 2),
                   Text(
-                    dateStr,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
-                      fontWeight: FontWeight.w600,
+                    dayStr,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 34,
+                      letterSpacing: -1.0,
                     ),
                   ),
                 ],
               ),
-              CircleAvatar(
-                radius: 24,
-                backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-                child: Icon(
-                  hour < 5 ? Icons.nightlight_round : hour < 17 ? Icons.wb_sunny_rounded : Icons.wb_twilight_rounded,
-                  color: Theme.of(context).colorScheme.primary,
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.2),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      hour < 5
+                          ? Icons.nightlight_round
+                          : hour < 17
+                              ? Icons.wb_sunny_rounded
+                              : Icons.wb_twilight_rounded,
+                      size: 16,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      dateStr,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: Theme.of(context).colorScheme.onSurface,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
           const SizedBox(height: 24),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                _StatCard(
+          Row(
+            children: [
+              Expanded(
+                child: _StatCard(
                   title: 'This Week',
                   value: '$thisWeekCount',
                   icon: Icons.calendar_today_rounded,
-                  color: Colors.blue,
+                  color: const Color(0xFF3B82F6),
                 ),
-                const SizedBox(width: 12),
-                _StatCard(
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _StatCard(
                   title: 'Habits',
                   value: '$habitCount',
                   icon: Icons.local_fire_department_rounded,
-                  color: Colors.orange,
+                  color: const Color(0xFFF97316),
                 ),
-                const SizedBox(width: 12),
-                _StatCard(
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _StatCard(
                   title: 'Total',
                   value: '${ref.watch(eventsProvider).length}',
                   icon: Icons.all_inclusive_rounded,
-                  color: Colors.purple,
+                  color: const Color(0xFFA855F7),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ],
       ),
@@ -1054,6 +1119,111 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
+class _DashboardInsight {
+  const _DashboardInsight({
+    required this.tag,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.gradient,
+    this.backgroundEmoji,
+    this.width = 200,
+    this.titleSize = 18,
+    this.onTap,
+  });
+
+  final String tag;
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final List<Color> gradient;
+  final String? backgroundEmoji;
+  final double width;
+  final double titleSize;
+  final VoidCallback? onTap;
+}
+
+class _InsightCard extends StatelessWidget {
+  const _InsightCard({
+    required this.child,
+    required this.gradient,
+    this.width,
+    this.onTap,
+  });
+
+  final Widget child;
+  final List<Color> gradient;
+  final double? width;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 12),
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          width: width,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(32),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: gradient,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: gradient.first.withValues(alpha: 0.3),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(32),
+            child: child,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DashboardTag extends StatelessWidget {
+  const _DashboardTag({required this.label, required this.icon});
+
+  final String label;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.1), width: 1),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: Colors.white, size: 12),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: GoogleFonts.plusJakartaSans(
+              color: Colors.white,
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1.0,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _StatCard extends StatelessWidget {
   const _StatCard({
     required this.title,
@@ -1070,34 +1240,47 @@ class _StatCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 120,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withValues(alpha: 0.1), width: 1),
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: color.withValues(alpha: 0.15),
+          width: 1.5,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: color, size: 20),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: color, size: 16),
+          ),
           const SizedBox(height: 12),
           Text(
             value,
-            style: TextStyle(
-              fontSize: 24,
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 22,
               fontWeight: FontWeight.w900,
               color: color,
+              height: 1.0,
             ),
           ),
+          const SizedBox(height: 4),
           Text(
             title,
-            style: TextStyle(
-              fontSize: 11,
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 10,
               fontWeight: FontWeight.w700,
               color: color.withValues(alpha: 0.7),
-              letterSpacing: 0.2,
+              letterSpacing: 0.5,
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),

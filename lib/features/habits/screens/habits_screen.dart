@@ -23,203 +23,201 @@ class HabitsScreen extends ConsumerWidget {
       return h.checkIns.any((d) => DateHelpers.sameDay(d, today));
     }).length;
 
-    return CustomScrollView(
-      slivers: <Widget>[
-        // ── Header ────────────────────────────────────────────────────
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                // Title row
-                Row(
+    return Scaffold(
+      body: SafeArea(
+        child: CustomScrollView(
+          slivers: <Widget>[
+            // ── Header ────────────────────────────────────────────────────
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: <Widget>[
-                          Text('Habits',
-                              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: -1.0,
-                              )),
-                          const SizedBox(height: 2),
-                          Text(
-                            habits.isEmpty
-                                ? 'Start tracking your streaks'
-                                : '${habits.length} habit${habits.length == 1 ? '' : 's'} tracked',
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                  color: scheme.onSurface.withValues(alpha: 0.50),
-                                  fontWeight: FontWeight.w600,
-                                ),
+                    // Title row
+                    Row(
+                      children: <Widget>[
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: <Widget>[
+                              Text('Habits',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .headlineMedium
+                                      ?.copyWith(
+                                        fontWeight: FontWeight.w900,
+                                        letterSpacing: -1.0,
+                                      )),
+                              const SizedBox(height: 2),
+                              Text(
+                                habits.isEmpty
+                                    ? 'Start tracking your streaks'
+                                    : '${habits.length} habit${habits.length == 1 ? '' : 's'} tracked',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodyMedium
+                                    ?.copyWith(
+                                      color: scheme.onSurface
+                                          .withValues(alpha: 0.50),
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
-                    ),
-                    Container(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [scheme.primary, scheme.primary.withValues(alpha: 0.8)],
                         ),
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color: scheme.primary.withValues(alpha: 0.3),
-                            blurRadius: 12,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: FilledButton.icon(
-                        onPressed: () => _showAddHabitDialog(context, ref),
-                        style: FilledButton.styleFrom(
-                          backgroundColor: Colors.transparent,
-                          shadowColor: Colors.transparent,
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                        ),
-                        icon: const Icon(Icons.add_rounded, size: 18),
-                        label: const Text('New habit', style: TextStyle(fontWeight: FontWeight.w700)),
-                      ),
-                    ),
-                  ],
-                ),
-                // ── Summary banner (only if we have habits) ───────────
-                if (habits.isNotEmpty) ...<Widget>[
-                  const SizedBox(height: 24),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: isDark
-                            ? [const Color(0xFF2C1A0E), const Color(0xFF1E1E1E)]
-                            : [const Color(0xFFFFF3E0), Colors.white],
-                      ),
-                      borderRadius: BorderRadius.circular(28),
-                      border: Border.all(
-                        color: Colors.orange.withValues(alpha: isDark ? 0.2 : 0.15),
-                        width: 1.5,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.orange.withValues(alpha: 0.05),
-                          blurRadius: 20,
-                          offset: const Offset(0, 10),
+                        _NewHabitButton(
+                          onPressed: () => _showAddHabitDialog(context, ref),
                         ),
                       ],
                     ),
-                    child: IntrinsicHeight(
-                      child: Row(
-                        children: <Widget>[
-                          Expanded(
-                            child: _HabitSummaryBadge(
-                              icon: '🔥',
-                              label: 'On streak',
-                              value: '$activeStreaks',
-                              color: Colors.orange,
+                    // ── Summary banner (only if we have habits) ───────────
+                    if (habits.isNotEmpty) ...<Widget>[
+                      const SizedBox(height: 24),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 24, vertical: 20),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: isDark
+                                ? [
+                                    const Color(0xFF2C1A0E),
+                                    const Color(0xFF1E1E1E)
+                                  ]
+                                : [const Color(0xFFFFF3E0), Colors.white],
+                          ),
+                          borderRadius: BorderRadius.circular(28),
+                          border: Border.all(
+                            color: Colors.orange
+                                .withValues(alpha: isDark ? 0.2 : 0.15),
+                            width: 1.5,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.orange.withValues(alpha: 0.05),
+                              blurRadius: 20,
+                              offset: const Offset(0, 10),
                             ),
+                          ],
+                        ),
+                        child: IntrinsicHeight(
+                          child: Row(
+                            children: <Widget>[
+                              Expanded(
+                                child: _HabitSummaryBadge(
+                                  icon: '🔥',
+                                  label: 'On streak',
+                                  value: '$activeStreaks',
+                                  color: Colors.orange,
+                                ),
+                              ),
+                              VerticalDivider(
+                                color: Colors.orange.withValues(alpha: 0.2),
+                                thickness: 1,
+                                width: 32,
+                                indent: 4,
+                                endIndent: 4,
+                              ),
+                              Expanded(
+                                child: _HabitSummaryBadge(
+                                  icon: '✅',
+                                  label: 'Done today',
+                                  value: '$checkedToday/${habits.length}',
+                                  color: Colors.green,
+                                ),
+                              ),
+                            ],
                           ),
-                          VerticalDivider(
-                            color: Colors.orange.withValues(alpha: 0.2),
-                            thickness: 1,
-                            width: 32,
-                            indent: 4,
-                            endIndent: 4,
-                          ),
-                          Expanded(
-                            child: _HabitSummaryBadge(
-                              icon: '✅',
-                              label: 'Done today',
-                              value: '$checkedToday/${habits.length}',
-                              color: Colors.green,
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 12),
-              ],
-            ),
-          ),
-        ),
-        // ── Empty state ───────────────────────────────────────────────
-        if (habits.isEmpty)
-          SliverFillRemaining(
-            hasScrollBody: false,
-            child: Center(
-              child: Padding(
-                padding: const EdgeInsets.all(40),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: <Widget>[
-                    SizedBox(
-                      width: 120,
-                      height: 120,
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: <Widget>[
-                          Container(
-                            width: 120,
-                            height: 120,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: Colors.orange.withValues(alpha: 0.08),
-                            ),
-                          ),
-                          Container(
-                            width: 86,
-                            height: 86,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: Colors.orange.withValues(alpha: 0.14),
-                            ),
-                          ),
-                          const Text('🔥', style: TextStyle(fontSize: 40)),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    Text('No habits yet',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: -0.3,
-                            )),
-                    const SizedBox(height: 10),
-                    Text(
-                      'Tap "New habit" above to start\nyour first daily streak.',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: scheme.onSurface.withValues(alpha: 0.50),
-                            height: 1.55,
-                          ),
-                      textAlign: TextAlign.center,
-                    ),
+                    ],
+                    const SizedBox(height: 12),
                   ],
                 ),
               ),
             ),
-          )
-        else
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
-            sliver: SliverList(
-              delegate: SliverChildBuilderDelegate(
-                (BuildContext context, int index) =>
-                    _HabitCard(habit: habits[index], ref: ref),
-                childCount: habits.length,
+            // ── Empty state ───────────────────────────────────────────────
+            if (habits.isEmpty)
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(40),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: <Widget>[
+                        SizedBox(
+                          width: 120,
+                          height: 120,
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: <Widget>[
+                              Container(
+                                width: 120,
+                                height: 120,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Colors.orange.withValues(alpha: 0.08),
+                                ),
+                              ),
+                              Container(
+                                width: 86,
+                                height: 86,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Colors.orange.withValues(alpha: 0.14),
+                                ),
+                              ),
+                              const Text('🔥', style: TextStyle(fontSize: 40)),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        Text('No habits yet',
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleLarge
+                                ?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: -0.3,
+                                )),
+                        const SizedBox(height: 10),
+                        Text(
+                          'Tap "New habit" above to start\nyour first daily streak.',
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                color: scheme.onSurface.withValues(alpha: 0.50),
+                                height: 1.55,
+                              ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              )
+            else
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 100),
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (BuildContext context, int index) =>
+                        _HabitCard(habit: habits[index], ref: ref),
+                    childCount: habits.length,
+                  ),
+                ),
               ),
-            ),
-          ),
-      ],
+          ],
+        ),
+      ),
     );
   }
 
   Future<void> _showAddHabitDialog(BuildContext context, WidgetRef ref) async {
     final TextEditingController titleController = TextEditingController();
-    final TextEditingController emojiController = TextEditingController(text: '✅');
+    final TextEditingController emojiController =
+        TextEditingController(text: '✅');
     final scheme = Theme.of(context).colorScheme;
 
     await showModalBottomSheet<void>(
@@ -228,7 +226,8 @@ class HabitsScreen extends ConsumerWidget {
       backgroundColor: Colors.transparent,
       builder: (BuildContext context) {
         return Container(
-          padding: EdgeInsets.fromLTRB(20, 20, 20, MediaQuery.of(context).viewInsets.bottom + 32),
+          padding: EdgeInsets.fromLTRB(
+              20, 20, 20, MediaQuery.of(context).viewInsets.bottom + 32),
           decoration: BoxDecoration(
             color: scheme.surface,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
@@ -262,7 +261,8 @@ class HabitsScreen extends ConsumerWidget {
                 child: TextField(
                   controller: titleController,
                   textCapitalization: TextCapitalization.sentences,
-                  style: GoogleFonts.nunito(fontSize: 18, fontWeight: FontWeight.w700),
+                  style: GoogleFonts.nunito(
+                      fontSize: 18, fontWeight: FontWeight.w700),
                   decoration: InputDecoration(
                     hintText: 'Habit name (e.g. Read 20 mins)',
                     hintStyle: GoogleFonts.nunito(
@@ -270,7 +270,8 @@ class HabitsScreen extends ConsumerWidget {
                       color: scheme.onSurface.withValues(alpha: 0.3),
                     ),
                     border: InputBorder.none,
-                    prefixIcon: Icon(Icons.local_fire_department_rounded, color: scheme.primary),
+                    prefixIcon: Icon(Icons.local_fire_department_rounded,
+                        color: scheme.primary),
                   ),
                   autofocus: true,
                 ),
@@ -280,7 +281,8 @@ class HabitsScreen extends ConsumerWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 child: TextField(
                   controller: emojiController,
-                  style: GoogleFonts.nunito(fontSize: 18, fontWeight: FontWeight.w700),
+                  style: GoogleFonts.nunito(
+                      fontSize: 18, fontWeight: FontWeight.w700),
                   decoration: InputDecoration(
                     hintText: 'Emoji',
                     hintStyle: GoogleFonts.nunito(
@@ -288,7 +290,8 @@ class HabitsScreen extends ConsumerWidget {
                       color: scheme.onSurface.withValues(alpha: 0.3),
                     ),
                     border: InputBorder.none,
-                    prefixIcon: Icon(Icons.emoji_emotions_outlined, color: scheme.primary),
+                    prefixIcon: Icon(Icons.emoji_emotions_outlined,
+                        color: scheme.primary),
                   ),
                 ),
               ),
@@ -310,12 +313,14 @@ class HabitsScreen extends ConsumerWidget {
                     if (context.mounted) Navigator.of(context).pop();
                   },
                   style: FilledButton.styleFrom(
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20)),
                     backgroundColor: scheme.primary,
                   ),
                   child: Text(
                     'Create Habit',
-                    style: GoogleFonts.nunito(fontSize: 16, fontWeight: FontWeight.w800),
+                    style: GoogleFonts.nunito(
+                        fontSize: 16, fontWeight: FontWeight.w800),
                   ),
                 ),
               ),
@@ -328,6 +333,42 @@ class HabitsScreen extends ConsumerWidget {
 }
 
 // ── Shared Helpers ──────────────────────────────────────────────────────────
+
+class _NewHabitButton extends StatelessWidget {
+  const _NewHabitButton({required this.onPressed});
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [scheme.primary, scheme.primary.withValues(alpha: 0.8)],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: scheme.primary.withValues(alpha: 0.3),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: FilledButton.icon(
+        onPressed: onPressed,
+        style: FilledButton.styleFrom(
+          backgroundColor: Colors.transparent,
+          shadowColor: Colors.transparent,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        ),
+        icon: const Icon(Icons.add_rounded, size: 18),
+        label: const Text('New habit',
+            style: TextStyle(fontWeight: FontWeight.w700)),
+      ),
+    );
+  }
+}
 
 class _FormCard extends StatelessWidget {
   const _FormCard({required this.child, this.padding});
@@ -421,7 +462,8 @@ class _HabitCard extends StatelessWidget {
                     ],
                   ),
                   child: Center(
-                    child: Text(habit.emoji, style: const TextStyle(fontSize: 28)),
+                    child:
+                        Text(habit.emoji, style: const TextStyle(fontSize: 28)),
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -489,12 +531,14 @@ class _HabitCard extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: Colors.green.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Colors.green.withValues(alpha: 0.2)),
+                        border:
+                            Border.all(color: Colors.green.withValues(alpha: 0.2)),
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Icon(Icons.check_circle_rounded, color: Colors.green, size: 20),
+                          const Icon(Icons.check_circle_rounded,
+                              color: Colors.green, size: 20),
                           const SizedBox(width: 8),
                           Text(
                             'Completed today',
@@ -514,7 +558,8 @@ class _HabitCard extends StatelessWidget {
                       style: FilledButton.styleFrom(
                         backgroundColor: habitColor,
                         foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16)),
                         elevation: 0,
                       ),
                     ),
@@ -654,4 +699,3 @@ class _HabitSummaryBadge extends StatelessWidget {
     );
   }
 }
-

@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 import '../../../core/auth_service.dart';
@@ -25,202 +26,247 @@ class AccountScreen extends ConsumerWidget {
             defaultTargetPlatform == TargetPlatform.macOS);
 
     return Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: const Text('Account Details'),
+        title: Text(
+          'Account Details',
+          style: GoogleFonts.plusJakartaSans(
+            fontWeight: FontWeight.w800,
+            fontSize: 20,
+          ),
+        ),
         centerTitle: true,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
       ),
-      body: ListView(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-        children: <Widget>[
-          // ── Profile Header ──────────────────────────────────────────
+      body: Stack(
+        children: [
+          // ── Premium background ──────────────────────────────────────────
           Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
+            width: double.infinity,
+            height: double.infinity,
+            decoration: const BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [
-                  scheme.primaryContainer.withValues(alpha: 0.6),
-                  scheme.primaryContainer.withValues(alpha: 0.2),
-                ],
+                colors: [Color(0xFF1A1C2E), Color(0xFF12131F)],
               ),
-              borderRadius: BorderRadius.circular(28),
-              border: Border.all(color: scheme.primary.withValues(alpha: 0.1)),
             ),
-            child: Column(
-              children: [
-                Stack(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(color: scheme.primary, width: 2),
-                      ),
-                      child: CircleAvatar(
-                        radius: 40,
-                        backgroundColor: scheme.surface,
-                        backgroundImage: user?.photoURL == null || user!.photoURL!.isEmpty
-                            ? null
-                            : NetworkImage(user.photoURL!),
-                        child: user?.photoURL == null || user!.photoURL!.isEmpty
-                            ? Icon(Icons.person, size: 40, color: scheme.primary)
-                            : null,
-                      ),
+          ),
+          // ── Decorative Glow ─────────────────────────────────────────────
+          Positioned(
+            top: -100,
+            right: -100,
+            child: Container(
+              width: 300,
+              height: 300,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: scheme.primary.withValues(alpha: 0.08),
+              ),
+            ),
+          ),
+          SafeArea(
+            child: ListView(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+              children: <Widget>[
+                // ── Profile Header ──────────────────────────────────────────
+                Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(32),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.1),
+                      width: 1.5,
                     ),
-                    if (user != null)
-                      Positioned(
-                        right: 0,
-                        bottom: 0,
-                        child: Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: BoxDecoration(
-                            color: Colors.green,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: scheme.surface, width: 2),
+                  ),
+                  child: Column(
+                    children: [
+                      Stack(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(color: scheme.primary, width: 2),
+                            ),
+                            child: CircleAvatar(
+                              radius: 44,
+                              backgroundColor: Colors.white.withValues(alpha: 0.1),
+                              backgroundImage: user?.photoURL == null || user!.photoURL!.isEmpty
+                                  ? null
+                                  : NetworkImage(user.photoURL!),
+                              child: user?.photoURL == null || user!.photoURL!.isEmpty
+                                  ? Icon(Icons.person, size: 44, color: scheme.primary)
+                                  : null,
+                            ),
                           ),
-                          child: const Icon(Icons.check, size: 12, color: Colors.white),
+                          if (user != null)
+                            Positioned(
+                              right: 2,
+                              bottom: 2,
+                              child: Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF4CAF50),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: const Color(0xFF1A1C2E), width: 2),
+                                ),
+                                child: const Icon(Icons.check, size: 12, color: Colors.white),
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                      Text(
+                        user?.displayName ?? 'Guest Mode',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                          letterSpacing: -0.5,
                         ),
                       ),
+                      const SizedBox(height: 4),
+                      Text(
+                        user?.email ?? 'Cloud sync is disabled',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.white.withValues(alpha: 0.5),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 32),
+
+                const _SectionHeader(label: 'CLOUD STORAGE'),
+                const SizedBox(height: 12),
+                _AccountGroup(
+                  children: [
+                    _AccountRow(
+                      icon: Icons.history_rounded,
+                      title: 'Last Synced',
+                      subtitle: sync.lastSyncedAt?.toLocal().toString().split('.').first ?? 'Never',
+                    ),
+                    _AccountDivider(),
+                    _AccountRow(
+                      icon: Icons.data_usage_rounded,
+                      title: 'Storage Usage',
+                      subtitle: _estimateStorage(),
+                    ),
                   ],
                 ),
-                const SizedBox(height: 16),
-                Text(
-                  user?.displayName ?? 'Guest Mode',
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: -0.5,
-                      ),
-                ),
-                Text(
-                  user?.email ?? 'Cloud sync is disabled',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: scheme.onSurface.withValues(alpha: 0.6),
-                      ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 32),
+                const SizedBox(height: 24),
 
-          const _SectionHeader(label: 'CLOUD STORAGE'),
-          const SizedBox(height: 12),
-          _AccountGroup(
-            children: [
-              _AccountRow(
-                icon: Icons.history_rounded,
-                title: 'Last Synced',
-                subtitle: sync.lastSyncedAt?.toLocal().toString().split('.').first ?? 'Never',
-              ),
-              _AccountDivider(),
-              _AccountRow(
-                icon: Icons.data_usage_rounded,
-                title: 'Storage Usage',
-                subtitle: _estimateStorage(),
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-
-          if (user != null) ...[
-            const _SectionHeader(label: 'ACTIONS'),
-            const SizedBox(height: 12),
-            _AccountGroup(
-              children: [
-                _ActionTile(
-                  icon: Icons.sync_rounded,
-                  label: 'Force Cloud Sync',
-                  onTap: () => sync.syncAll(messenger: ScaffoldMessenger.of(context)),
-                  isPrimary: true,
-                ),
-                _AccountDivider(),
-                _ActionTile(
-                  icon: Icons.cloud_off_outlined,
-                  label: 'Clear Cloud Backup',
-                  onTap: () => _confirmClearCloudBackup(context, sync),
-                ),
-                _AccountDivider(),
-                _ActionTile(
-                  icon: Icons.logout_rounded,
-                  label: 'Sign Out',
-                  onTap: () async {
-                    await auth.signOut();
-                    ref.read(guestModeProvider.notifier).state = false;
-                  },
-                  textColor: scheme.error,
-                ),
-              ],
-            ),
-          ] else ...[
-            const _SectionHeader(label: 'GET STARTED'),
-            const SizedBox(height: 12),
-            _AccountGroup(
-              children: [
-                _ActionTile(
-                  icon: Icons.g_mobiledata_rounded,
-                  label: 'Sign in with Google',
-                  onTap: () => _signInAndSync(
-                    context: context,
-                    auth: auth,
-                    sync: sync,
-                    useGoogle: true,
+                if (user != null) ...[
+                  const _SectionHeader(label: 'ACTIONS'),
+                  const SizedBox(height: 12),
+                  _AccountGroup(
+                    children: [
+                      _ActionTile(
+                        icon: Icons.sync_rounded,
+                        label: 'Force Cloud Sync',
+                        onTap: () => sync.syncAll(messenger: ScaffoldMessenger.of(context)),
+                        isPrimary: true,
+                      ),
+                      _AccountDivider(),
+                      _ActionTile(
+                        icon: Icons.cloud_off_outlined,
+                        label: 'Clear Cloud Backup',
+                        onTap: () => _confirmClearCloudBackup(context, sync),
+                      ),
+                      _AccountDivider(),
+                      _ActionTile(
+                        icon: Icons.logout_rounded,
+                        label: 'Sign Out',
+                        onTap: () async {
+                          await auth.signOut();
+                          ref.read(guestModeProvider.notifier).state = false;
+                        },
+                        textColor: scheme.error,
+                      ),
+                    ],
                   ),
-                  isPrimary: true,
-                ),
-                if (supportsAppleSignIn) ...[
-                  _AccountDivider(),
-                  _ActionTile(
-                    icon: Icons.apple_rounded,
-                    label: 'Sign in with Apple',
-                    onTap: () => _signInAndSync(
-                      context: context,
-                      auth: auth,
-                      sync: sync,
-                      useGoogle: false,
+                ] else ...[
+                  const _SectionHeader(label: 'GET STARTED'),
+                  const SizedBox(height: 12),
+                  _AccountGroup(
+                    children: [
+                      _ActionTile(
+                        icon: Icons.g_mobiledata_rounded,
+                        label: 'Sign in with Google',
+                        onTap: () => _signInAndSync(
+                          context: context,
+                          auth: auth,
+                          sync: sync,
+                          useGoogle: true,
+                        ),
+                        isPrimary: true,
+                      ),
+                      if (supportsAppleSignIn) ...[
+                        _AccountDivider(),
+                        _ActionTile(
+                          icon: Icons.apple_rounded,
+                          label: 'Sign in with Apple',
+                          onTap: () => _signInAndSync(
+                            context: context,
+                            auth: auth,
+                            sync: sync,
+                            useGoogle: false,
+                          ),
+                        ),
+                      ],
+                      _AccountDivider(),
+                      _ActionTile(
+                        icon: Icons.email_outlined,
+                        label: 'Sign in with Email',
+                        onTap: () => _showEmailAuthDialog(
+                          context: context,
+                          auth: auth,
+                          sync: sync,
+                          createAccount: false,
+                        ),
+                      ),
+                      _AccountDivider(),
+                      _ActionTile(
+                        icon: Icons.person_add_alt_1_rounded,
+                        label: 'Create Account',
+                        onTap: () => _showEmailAuthDialog(
+                          context: context,
+                          auth: auth,
+                          sync: sync,
+                          createAccount: true,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+                
+                if (user != null) ...[
+                  const SizedBox(height: 40),
+                  Center(
+                    child: TextButton.icon(
+                      onPressed: () => _confirmDelete(context, auth),
+                      icon: const Icon(Icons.delete_outline_rounded, size: 18),
+                      label: Text(
+                        'Delete Account Permanently',
+                        style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w600),
+                      ),
+                      style: TextButton.styleFrom(foregroundColor: scheme.error.withValues(alpha: 0.8)),
                     ),
                   ),
                 ],
-                _AccountDivider(),
-                _ActionTile(
-                  icon: Icons.email_outlined,
-                  label: 'Sign in with Email',
-                  onTap: () => _showEmailAuthDialog(
-                    context: context,
-                    auth: auth,
-                    sync: sync,
-                    createAccount: false,
-                  ),
-                ),
-                _AccountDivider(),
-                _ActionTile(
-                  icon: Icons.person_add_alt_1_rounded,
-                  label: 'Create Account',
-                  onTap: () => _showEmailAuthDialog(
-                    context: context,
-                    auth: auth,
-                    sync: sync,
-                    createAccount: true,
-                  ),
-                ),
+                const SizedBox(height: 24),
               ],
             ),
-          ],
-          
-          if (user != null) ...[
-            const SizedBox(height: 40),
-            Center(
-              child: TextButton.icon(
-                onPressed: () => _confirmDelete(context, auth),
-                icon: const Icon(Icons.delete_outline_rounded, size: 18),
-                label: const Text('Delete Account Permanently'),
-                style: TextButton.styleFrom(foregroundColor: scheme.error),
-              ),
-            ),
-          ],
-          const SizedBox(height: 24),
+          ),
         ],
       ),
     );
+
   }
 
   String _estimateStorage() {
@@ -483,11 +529,12 @@ class _SectionHeader extends StatelessWidget {
       padding: const EdgeInsets.only(left: 4),
       child: Text(
         label,
-        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: scheme.primary,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 1.2,
-            ),
+        style: GoogleFonts.plusJakartaSans(
+          color: Colors.white.withValues(alpha: 0.4),
+          fontWeight: FontWeight.w800,
+          fontSize: 11,
+          letterSpacing: 1.2,
+        ),
       ),
     );
   }
@@ -499,12 +546,11 @@ class _AccountGroup extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     return Container(
       decoration: BoxDecoration(
-        color: scheme.surface,
+        color: Colors.white.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.4)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(children: children),
@@ -526,10 +572,10 @@ class _AccountRow extends StatelessWidget {
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               color: scheme.primary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(14),
             ),
             child: Icon(icon, size: 20, color: scheme.primary),
           ),
@@ -538,8 +584,23 @@ class _AccountRow extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-                Text(subtitle, style: TextStyle(color: scheme.onSurface.withValues(alpha: 0.6), fontSize: 13)),
+                Text(
+                  title,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                    fontSize: 15,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: GoogleFonts.plusJakartaSans(
+                    color: Colors.white.withValues(alpha: 0.5),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
               ],
             ),
           ),
@@ -570,20 +631,25 @@ class _ActionTile extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         child: Row(
           children: [
-            Icon(icon, size: 22, color: textColor ?? (isPrimary ? scheme.primary : scheme.onSurface.withValues(alpha: 0.7))),
+            Icon(
+              icon,
+              size: 22,
+              color: textColor ?? (isPrimary ? scheme.primary : Colors.white.withValues(alpha: 0.7)),
+            ),
             const SizedBox(width: 16),
             Text(
               label,
-              style: TextStyle(
+              style: GoogleFonts.plusJakartaSans(
                 fontWeight: isPrimary ? FontWeight.w800 : FontWeight.w600,
-                color: textColor ?? (isPrimary ? scheme.primary : scheme.onSurface),
+                color: textColor ?? (isPrimary ? scheme.primary : Colors.white),
+                fontSize: 15,
               ),
             ),
             const Spacer(),
-            Icon(Icons.chevron_right_rounded, size: 18, color: scheme.onSurface.withValues(alpha: 0.3)),
+            Icon(Icons.chevron_right_rounded, size: 20, color: Colors.white.withValues(alpha: 0.2)),
           ],
         ),
       ),
@@ -597,8 +663,9 @@ class _AccountDivider extends StatelessWidget {
   Widget build(BuildContext context) {
     return Divider(
       height: 1,
-      indent: 54,
-      color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.4),
+      indent: 60,
+      color: Colors.white.withValues(alpha: 0.05),
     );
   }
 }
+

@@ -14,41 +14,41 @@ class BottomNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme  = Theme.of(context).colorScheme;
-    final isDark  = Theme.of(context).brightness == Brightness.dark;
-    final bottom  = MediaQuery.of(context).padding.bottom;
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bottom = MediaQuery.of(context).padding.bottom;
 
-    return Padding(
-      padding: EdgeInsets.fromLTRB(16, 0, 16, bottom > 0 ? bottom : 16),
+    return Container(
+      padding: EdgeInsets.fromLTRB(20, 0, 20, bottom > 0 ? bottom : 20),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(32),
+        borderRadius: BorderRadius.circular(36),
         child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+          filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
           child: Container(
-            height: 68,
+            height: 76,
             decoration: BoxDecoration(
               color: isDark
-                  ? scheme.surfaceContainerLow.withValues(alpha: 0.90)
-                  : scheme.surface.withValues(alpha: 0.94),
-              borderRadius: BorderRadius.circular(32),
+                  ? const Color(0xFF1A1B28).withValues(alpha: 0.85)
+                  : Colors.white.withValues(alpha: 0.88),
+              borderRadius: BorderRadius.circular(36),
               border: Border.all(
-                color: scheme.outlineVariant.withValues(alpha: 0.20),
-                width: 1,
+                color: scheme.primary.withValues(alpha: 0.12),
+                width: 1.5,
               ),
               boxShadow: <BoxShadow>[
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: isDark ? 0.42 : 0.10),
+                  color: Colors.black.withValues(alpha: isDark ? 0.5 : 0.08),
                   blurRadius: 40,
-                  offset: const Offset(0, 10),
+                  offset: const Offset(0, 12),
                 ),
               ],
             ),
             child: Row(
               children: <Widget>[
                 _NavItem(
-                  icon: Icons.home_outlined,
-                  selectedIcon: Icons.home_rounded,
-                  label: 'Home',
+                  icon: Icons.grid_view_outlined,
+                  selectedIcon: Icons.grid_view_rounded,
+                  label: 'Board',
                   index: 0,
                   currentIndex: currentIndex,
                   onTap: onTap,
@@ -56,24 +56,24 @@ class BottomNav extends StatelessWidget {
                 _NavItem(
                   icon: Icons.local_fire_department_outlined,
                   selectedIcon: Icons.local_fire_department_rounded,
-                  label: 'Habits',
+                  label: 'Streaks',
                   index: 1,
                   currentIndex: currentIndex,
                   onTap: onTap,
                 ),
                 _CenterButton(onTap: () => onTap(2)),
                 _NavItem(
-                  icon: Icons.notifications_outlined,
+                  icon: Icons.notifications_none_rounded,
                   selectedIcon: Icons.notifications_rounded,
-                  label: 'Alerts',
+                  label: 'Inbox',
                   index: 3,
                   currentIndex: currentIndex,
                   onTap: onTap,
                 ),
                 _NavItem(
-                  icon: Icons.settings_outlined,
-                  selectedIcon: Icons.settings_rounded,
-                  label: 'Settings',
+                  icon: Icons.person_outline_rounded,
+                  selectedIcon: Icons.person_rounded,
+                  label: 'Profile',
                   index: 4,
                   currentIndex: currentIndex,
                   onTap: onTap,
@@ -158,40 +158,31 @@ class _CenterButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return Expanded(
-      child: Center(
-        child: GestureDetector(
-          onTap: onTap,
-          child: Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: <Color>[
-                  scheme.primary,
-                  Color.lerp(scheme.primary, scheme.tertiary, 0.55)!,
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: <BoxShadow>[
-                BoxShadow(
-                  color: scheme.primary.withValues(alpha: 0.50),
-                  blurRadius: 22,
-                  spreadRadius: -2,
-                  offset: const Offset(0, 6),
-                ),
-                BoxShadow(
-                  color: scheme.primary.withValues(alpha: 0.15),
-                  blurRadius: 40,
-                  offset: const Offset(0, 12),
-                ),
-              ],
-            ),
-            child: Icon(Icons.add_rounded, color: scheme.onPrimary, size: 30),
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 60,
+        height: 60,
+        margin: const EdgeInsets.symmetric(horizontal: 4),
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: LinearGradient(
+            colors: <Color>[
+              scheme.primary,
+              scheme.secondary,
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
+          boxShadow: <BoxShadow>[
+            BoxShadow(
+              color: scheme.primary.withValues(alpha: 0.4),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
+            ),
+          ],
         ),
+        child: const Icon(Icons.add_rounded, color: Colors.white, size: 32),
       ),
     );
   }

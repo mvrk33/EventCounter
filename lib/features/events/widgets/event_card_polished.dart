@@ -32,30 +32,32 @@ class EventCardPolished extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final int value = DateHelpers.eventCountValue(event);
-    final String compactDescription = DateHelpers.eventCountCompactDescription(event);
+    final String compactDescription =
+        DateHelpers.eventCountCompactDescription(event);
     final String fullDescription = DateHelpers.eventCountDescription(event);
     final Color accent = Color(event.color);
     final bool comfortable = density == EventCardDensity.comfortable;
 
     return Container(
-      margin: EdgeInsets.symmetric(horizontal: 16, vertical: comfortable ? 8 : 5),
+      margin:
+          EdgeInsets.symmetric(horizontal: 16, vertical: comfortable ? 10 : 6),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(28),
         color: scheme.surface,
         boxShadow: <BoxShadow>[
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 15,
-            offset: const Offset(0, 5),
+            color: accent.withValues(alpha: 0.08),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
           ),
         ],
         border: Border.all(
-          color: accent.withValues(alpha: 0.1),
-          width: 1,
+          color: accent.withValues(alpha: 0.15),
+          width: 1.5,
         ),
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(28),
         child: Material(
           color: Colors.transparent,
           child: InkWell(
@@ -63,10 +65,13 @@ class EventCardPolished extends StatelessWidget {
             splashColor: accent.withValues(alpha: 0.05),
             highlightColor: accent.withValues(alpha: 0.02),
             child: Padding(
-              padding: EdgeInsets.fromLTRB(16, comfortable ? 16 : 12, 8, comfortable ? 14 : 12),
+              padding: EdgeInsets.fromLTRB(
+                  16, comfortable ? 18 : 14, 12, comfortable ? 18 : 14),
               child: comfortable
-                  ? _buildComfortableLayout(context, accent, value, compactDescription, fullDescription)
-                  : _buildCompactLayout(context, accent, value, compactDescription, scheme),
+                  ? _buildComfortableLayout(
+                      context, accent, value, compactDescription, fullDescription)
+                  : _buildCompactLayout(
+                      context, accent, value, compactDescription, scheme),
             ),
           ),
         ),
@@ -214,10 +219,22 @@ class EventCardPolished extends StatelessWidget {
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: accent.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(16),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            accent.withValues(alpha: 0.2),
+            accent.withValues(alpha: 0.05),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(20),
       ),
-      child: Center(child: Text(event.emoji, style: TextStyle(fontSize: emojiSize))),
+      child: Center(
+        child: Text(
+          event.emoji,
+          style: TextStyle(fontSize: emojiSize),
+        ),
+      ),
     );
   }
 

@@ -5,13 +5,13 @@ class AppTheme {
   const AppTheme._();
 
   // ── Brand seeds ────────────────────────────────────────────────────────────
-  static const Color _lightSeed = Color(0xFF5E6AD2);
-  static const Color _darkSeed  = Color(0xFF8B92E8);
+  static const Color _lightSeed = Color(0xFF3F51B5);
+  static const Color _darkSeed  = Color(0xFF9FA8DA);
 
   // ── Radii ──────────────────────────────────────────────────────────────────
-  static const double _radius   = 16.0;
-  static const double _radiusLg = 24.0;
-  static const double _radiusXl = 32.0;
+  static const double _radius   = 20.0;
+  static const double _radiusLg = 28.0;
+  static const double _radiusXl = 36.0;
 
   // ── Shadow helpers ─────────────────────────────────────────────────────────
   static List<BoxShadow> cardShadow(Color seed, {bool dark = false}) => [
@@ -136,9 +136,9 @@ class AppTheme {
           backgroundColor: scheme.primary,
           foregroundColor: scheme.onPrimary,
           elevation: 0,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 15),
-          textStyle: GoogleFonts.plusJakartaSans(fontSize: 15, fontWeight: FontWeight.w700, letterSpacing: 0.1),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          textStyle: GoogleFonts.plusJakartaSans(fontSize: 15, fontWeight: FontWeight.w700, letterSpacing: 0.2),
         ),
       ),
       // ── Outlined Button ───────────────────────────────────────────────────
@@ -146,10 +146,10 @@ class AppTheme {
         style: OutlinedButton.styleFrom(
           foregroundColor: scheme.primary,
           elevation: 0,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 15),
-          side: BorderSide(color: scheme.outline.withValues(alpha: 0.30)),
-          textStyle: GoogleFonts.plusJakartaSans(fontSize: 15, fontWeight: FontWeight.w600),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          side: BorderSide(color: scheme.primary.withValues(alpha: 0.25), width: 1.5),
+          textStyle: GoogleFonts.plusJakartaSans(fontSize: 15, fontWeight: FontWeight.w700),
         ),
       ),
       // ── Text Button ───────────────────────────────────────────────────────
