@@ -331,34 +331,34 @@ class EventCardPolished extends StatelessWidget {
         }
       },
       itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-        PopupMenuItem<String>(
+        const PopupMenuItem<String>(
           value: 'edit',
           child: Row(
             children: <Widget>[
-              const Icon(Icons.edit_rounded, size: 16),
-              const SizedBox(width: 12),
-              const Text('Edit'),
+              Icon(Icons.edit_rounded, size: 16),
+              SizedBox(width: 12),
+              Text('Edit'),
             ],
           ),
         ),
-        PopupMenuItem<String>(
+        const PopupMenuItem<String>(
           value: 'add_widget',
           child: Row(
             children: <Widget>[
-              const Icon(Icons.add_to_home_screen_rounded, size: 16),
-              const SizedBox(width: 12),
-              const Text('Add to Home'),
+              Icon(Icons.add_to_home_screen_rounded, size: 16),
+              SizedBox(width: 12),
+              Text('Add to Home'),
             ],
           ),
         ),
         const PopupMenuDivider(),
-        PopupMenuItem<String>(
+        const PopupMenuItem<String>(
           value: 'delete',
           child: Row(
             children: <Widget>[
-              const Icon(Icons.delete_outline_rounded, size: 16, color: Colors.red),
-              const SizedBox(width: 12),
-              const Text('Delete', style: TextStyle(color: Colors.red)),
+              Icon(Icons.delete_outline_rounded, size: 16, color: Colors.red),
+              SizedBox(width: 12),
+              Text('Delete', style: TextStyle(color: Colors.red)),
             ],
           ),
         ),

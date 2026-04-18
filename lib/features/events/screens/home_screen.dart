@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -36,12 +38,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   final ScreenshotController _screenshotController = ScreenshotController();
   final EventShareService _eventShareService = const EventShareService();
   final TextEditingController _searchController = TextEditingController();
+  Timer? _searchDebounce;
 
   String _searchQuery = '';
   String _selectedCategory = 'All';
   _EventSort _sort = _EventSort.nearest;
   _HomeCardView _cardView = _HomeCardView.comfortable;
   bool _filtersExpanded = false;
+
+  List<EventModel>? _cachedVisibleEvents;
+  List<EventModel>? _cachedSourceEvents;
+  String _cachedSearchQuery = '';
+  String _cachedSelectedCategory = 'All';
+  _EventSort _cachedSort = _EventSort.nearest;
 
   @override
   void initState() {
@@ -52,6 +61,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _pageController.dispose();
     _searchController.dispose();
     super.dispose();
@@ -252,8 +262,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             child: TextField(
               controller: _searchController,
               onChanged: (String value) {
-                setState(() {
-                  _searchQuery = value.trim().toLowerCase();
+                _searchDebounce?.cancel();
+                _searchDebounce = Timer(const Duration(milliseconds: 120), () {
+                  if (!mounted) return;
+                  setState(() {
+                    _searchQuery = value.trim().toLowerCase();
+                  });
                 });
               },
               decoration: InputDecoration(
@@ -489,6 +503,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   List<EventModel> _buildVisibleEvents(List<EventModel> events) {
+    if (identical(events, _cachedSourceEvents) &&
+        _searchQuery == _cachedSearchQuery &&
+        _selectedCategory == _cachedSelectedCategory &&
+        _sort == _cachedSort &&
+        _cachedVisibleEvents != null) {
+      return _cachedVisibleEvents!;
+    }
+
     final List<EventModel> filtered = events.where((EventModel event) {
       final bool categoryOk =
           _selectedCategory == 'All' || event.category == _selectedCategory;
@@ -515,6 +537,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           return a.title.toLowerCase().compareTo(b.title.toLowerCase());
       }
     });
+
+    _cachedSourceEvents = events;
+    _cachedSearchQuery = _searchQuery;
+    _cachedSelectedCategory = _selectedCategory;
+    _cachedSort = _sort;
+    _cachedVisibleEvents = sorted;
     return sorted;
   }
 
@@ -834,7 +862,7 @@ class _EventWidgetConfigDialogState
   Future<void> _pinEventWidget() async {
     try {
       // Write pending widget data so the new widget slot picks up this event
-      await const EventHomeWidgetService().pushPendingEventWidget(
+      await EventHomeWidgetService().pushPendingEventWidget(
         event: widget.event,
         transparent: _transparent,
         bgColor: _bgColor,

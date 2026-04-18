@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../notification_service.dart';
 
@@ -10,8 +11,42 @@ class NotificationsScreen extends ConsumerStatefulWidget {
   ConsumerState<NotificationsScreen> createState() => _NotificationsScreenState();
 }
 
-class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
+class _NotificationsScreenState extends ConsumerState<NotificationsScreen>
+    with WidgetsBindingObserver {
   TimeOfDay _time = const TimeOfDay(hour: 20, minute: 0);
+  PermissionStatus _permissionStatus = PermissionStatus.denied;
+  bool _loadingPermission = true;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _refreshPermissionStatus();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  // Re-check when user comes back from app settings.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _refreshPermissionStatus();
+    }
+  }
+
+  Future<void> _refreshPermissionStatus() async {
+    final PermissionStatus status = await Permission.notification.status;
+    if (mounted) {
+      setState(() {
+        _permissionStatus = status;
+        _loadingPermission = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -52,18 +87,78 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                       icon: Icons.notifications_active_rounded,
                       iconColor: const Color(0xFF5E6AD2),
                       title: 'Notification permission',
-                      subtitle: 'Allow Event Counter to send reminders',
-                      trailing: FilledButton(
-                        onPressed: () async {
-                          await notificationService.requestPermissions();
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                  content: Text('Permission request sent.')),
-                            );
-                          }
-                        },
-                        child: const Text('Request'),
+                      subtitle: _permissionStatus.isGranted
+                          ? 'Notifications are enabled ✓'
+                          : _permissionStatus.isPermanentlyDenied
+                              ? 'Permanently denied – open Settings to enable'
+                              : 'Allow Daymark to send reminders',
+                      trailing: _loadingPermission
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : _permissionStatus.isGranted
+                              ? Icon(Icons.check_circle_rounded,
+                                  color: Colors.green.shade600)
+                              : FilledButton(
+                                  onPressed: () async {
+                                    if (_permissionStatus.isPermanentlyDenied) {
+                                      await openAppSettings();
+                                    } else {
+                                      await notificationService
+                                          .requestPermissions();
+                                    }
+                                    await _refreshPermissionStatus();
+                                  },
+                                  child: Text(
+                                    _permissionStatus.isPermanentlyDenied
+                                        ? 'Settings'
+                                        : 'Allow',
+                                  ),
+                                ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                // ── Live event notifications ──────────────────────────
+                Padding(
+                  padding: const EdgeInsets.only(left: 4, bottom: 8),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'LIVE EVENT ALERTS',
+                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                            color: scheme.primary,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 1.2,
+                          ),
+                    ),
+                  ),
+                ),
+                _NotifGroup(
+                  children: <Widget>[
+                    _NotifRow(
+                      icon: Icons.wb_sunny_rounded,
+                      iconColor: Colors.amber,
+                      title: 'Daily morning summary',
+                      subtitle: 'Get a notification at 8 AM with today\'s events',
+                      trailing: OutlinedButton(
+                        onPressed: _permissionStatus.isGranted
+                            ? () async {
+                                await notificationService
+                                    .scheduleTodayEventsNotification();
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                          'Morning summary scheduled for 8 AM ✓'),
+                                    ),
+                                  );
+                                }
+                              }
+                            : null,
+                        child: const Text('Schedule'),
                       ),
                     ),
                   ],
@@ -92,18 +187,21 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                       title: 'Daily habit reminder',
                       subtitle: 'Reminder at ${_time.format(context)}',
                       trailing: OutlinedButton(
-                        onPressed: () async {
-                          final TimeOfDay? selected = await showTimePicker(
-                            context: context,
-                            initialTime: _time,
-                          );
-                          if (selected == null) return;
-                          setState(() => _time = selected);
-                          await notificationService.scheduleDailyHabitReminder(
-                            hour: selected.hour,
-                            minute: selected.minute,
-                          );
-                        },
+                        onPressed: _permissionStatus.isGranted
+                            ? () async {
+                                final TimeOfDay? selected = await showTimePicker(
+                                  context: context,
+                                  initialTime: _time,
+                                );
+                                if (selected == null) return;
+                                setState(() => _time = selected);
+                                await notificationService
+                                    .scheduleDailyHabitReminder(
+                                  hour: selected.hour,
+                                  minute: selected.minute,
+                                );
+                              }
+                            : null,
                         child: const Text('Change'),
                       ),
                     ),
@@ -125,11 +223,12 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
-                          'Event reminders are configured individually when you create or edit an event.',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: scheme.primary,
-                                fontWeight: FontWeight.w500,
-                              ),
+                          'Event reminders are also configured individually when you create or edit an event.',
+                          style:
+                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: scheme.primary,
+                                    fontWeight: FontWeight.w500,
+                                  ),
                         ),
                       ),
                     ],

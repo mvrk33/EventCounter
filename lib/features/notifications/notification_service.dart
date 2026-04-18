@@ -124,20 +124,26 @@ class NotificationService {
     await requestPermissions();
   }
 
-  // Schedules per-event reminder notifications.
+  // ── Scheduled reminder notifications ───────────────────────────────────────
+
+  /// Schedules per-event reminder notifications.
+  /// Uses [event.nextOccurrenceDate] so recurring events always fire at the
+  /// correct next occurrence (e.g. next anniversary, not the original date).
   Future<void> scheduleEventReminders(EventModel event) async {
     await _ensureInitialized();
-    if (!_isSupportedPlatform) {
-      return;
-    }
+    if (!_isSupportedPlatform) return;
 
     await cancelEventReminders(event.id);
 
+    // Use next occurrence so yearly/monthly/weekly reminders are always correct.
+    final DateTime nextDate = event.nextOccurrenceDate;
+
     for (final int day in event.reminderDays) {
+      // Fire at 9 AM, X days before the next occurrence.
       final DateTime scheduleAt = DateTime(
-        event.date.year,
-        event.date.month,
-        event.date.day,
+        nextDate.year,
+        nextDate.month,
+        nextDate.day,
         9,
       ).subtract(Duration(days: day));
 
@@ -145,50 +151,39 @@ class NotificationService {
         continue;
       }
 
-      try {
-        await _plugin.zonedSchedule(
-          _notificationId(event.id, day),
-          '${event.emoji} ${event.title}',
-          day == 0
-              ? 'Today is your event day.'
-              : '$day day(s) left until ${event.title}.',
-          tz.TZDateTime.from(scheduleAt, tz.local),
-          const NotificationDetails(
-            android: AndroidNotificationDetails(
-              _kEventChannel,
-              'Event Reminders',
-              importance: Importance.max,
-              priority: Priority.high,
-            ),
-            iOS: DarwinNotificationDetails(),
-          ),
-          uiLocalNotificationDateInterpretation:
-              UILocalNotificationDateInterpretation.absoluteTime,
-          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        );
-      } catch (e) {
-        // If exact alarms are not permitted, fall back to inexact alarms
-        if (e is PlatformException && e.code == 'exact_alarms_not_permitted') {
-          await _plugin.zonedSchedule(
+      final String body = day == 0
+          ? '${event.emoji} Today is ${event.title}!'
+          : '${event.emoji} ${event.title} is in $day day${day == 1 ? '' : 's'}.';
+
+      Future<void> schedule(AndroidScheduleMode mode) => _plugin.zonedSchedule(
             _notificationId(event.id, day),
             '${event.emoji} ${event.title}',
-            day == 0
-                ? 'Today is your event day.'
-                : '$day day(s) left until ${event.title}.',
+            body,
             tz.TZDateTime.from(scheduleAt, tz.local),
-            const NotificationDetails(
+            NotificationDetails(
               android: AndroidNotificationDetails(
                 _kEventChannel,
                 'Event Reminders',
+                channelDescription: 'Scheduled reminders before your events',
                 importance: Importance.max,
                 priority: Priority.high,
+                styleInformation: BigTextStyleInformation(body),
               ),
-              iOS: DarwinNotificationDetails(),
+              iOS: const DarwinNotificationDetails(
+                presentAlert: true,
+                presentSound: true,
+              ),
             ),
             uiLocalNotificationDateInterpretation:
                 UILocalNotificationDateInterpretation.absoluteTime,
-            androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+            androidScheduleMode: mode,
           );
+
+      try {
+        await schedule(AndroidScheduleMode.exactAllowWhileIdle);
+      } on PlatformException catch (e) {
+        if (e.code == 'exact_alarms_not_permitted') {
+          await schedule(AndroidScheduleMode.inexactAllowWhileIdle);
         } else {
           rethrow;
         }
@@ -196,15 +191,20 @@ class NotificationService {
     }
   }
 
-  Future<void> cancelEventReminders(String eventId) async {
+  /// Cancels all scheduled reminders for [eventId].
+  /// Cancels every day value in [knownReminderDays] (falls back to common set).
+  Future<void> cancelEventReminders(
+    String eventId, {
+    List<int> knownReminderDays = const <int>[0, 1, 2, 3, 7, 14, 30],
+  }) async {
     await _ensureInitialized();
-    if (!_isSupportedPlatform) {
-      return;
-    }
+    if (!_isSupportedPlatform) return;
 
-    for (final int day in <int>[0, 1, 7]) {
+    for (final int day in knownReminderDays) {
       await _plugin.cancel(_notificationId(eventId, day));
     }
+    // Always cancel the live progress notification too.
+    await _plugin.cancel(_liveProgressId(eventId));
   }
 
   Future<void> scheduleDailyHabitReminder({required int hour, required int minute}) async {
@@ -264,8 +264,8 @@ class NotificationService {
 
   // ── Live / Today's events notification ─────────────────────────────────────
 
-  /// Shows a live notification listing today's events.
-  /// Call this once at app start (and again whenever events change).
+  /// Shows a live notification listing today's events AND refreshes the
+  /// ongoing progress notification for every event.
   Future<void> showLiveEventNotification(List<EventModel> allEvents) async {
     await _ensureInitialized();
     if (!_isSupportedPlatform) return;
@@ -280,37 +280,160 @@ class NotificationService {
 
     if (todayEvents.isEmpty) {
       await _plugin.cancel(999002);
-      return;
+    } else {
+      final String title = todayEvents.length == 1
+          ? '${todayEvents.first.emoji} ${todayEvents.first.title} is today!'
+          : '${todayEvents.length} events happening today!';
+      final String body = todayEvents
+          .map((EventModel e) => '${e.emoji} ${e.title}')
+          .join(' · ');
+
+      await _plugin.show(
+        999002,
+        title,
+        body,
+        NotificationDetails(
+          android: AndroidNotificationDetails(
+            _kLiveChannel,
+            'Live Event Alerts',
+            channelDescription: 'Notifies you when events are happening today',
+            importance: Importance.high,
+            priority: Priority.high,
+            styleInformation: BigTextStyleInformation(body),
+          ),
+          iOS: const DarwinNotificationDetails(
+            presentAlert: true,
+            presentBadge: true,
+            presentSound: true,
+          ),
+        ),
+      );
     }
 
-    final String title = todayEvents.length == 1
-        ? '${todayEvents.first.emoji} ${todayEvents.first.title} is today!'
-        : '${todayEvents.length} events happening today!';
-    final String body = todayEvents
-        .map((EventModel e) => '${e.emoji} ${e.title}')
-        .join(' · ');
+    // Refresh the persistent progress notification for every event.
+    await refreshLiveProgressNotifications(allEvents);
+  }
+
+  // ── Live progress (ongoing) notifications ──────────────────────────────────
+
+  /// Posts/updates a persistent ongoing notification for every event that has
+  /// [liveNotification] enabled, and cancels it for events that have it off.
+  Future<void> refreshLiveProgressNotifications(
+      List<EventModel> allEvents) async {
+    await _ensureInitialized();
+    if (!_isSupportedPlatform) return;
+    if (!await hasNotificationPermission()) return;
+
+    for (final EventModel event in allEvents) {
+      if (event.liveNotification) {
+        await _postLiveProgressNotification(event);
+      } else {
+        // Cancel any stale progress notification if the flag was turned off.
+        await _plugin.cancel(_liveProgressId(event.id));
+      }
+    }
+  }
+
+  Future<void> _postLiveProgressNotification(EventModel event) async {
+    final DateTime now = DateTime.now();
+    final DateTime today = DateTime(now.year, now.month, now.day);
+    final DateTime nextDate = DateTime(
+      event.nextOccurrenceDate.year,
+      event.nextOccurrenceDate.month,
+      event.nextOccurrenceDate.day,
+    );
+
+    final int daysUntil = nextDate.difference(today).inDays;
+
+    // Compute progress (0–100).
+    int progress = 0;
+    int maxProgress = 100;
+    String subtitle;
+
+    if (event.mode == EventMode.countdown || daysUntil >= 0) {
+      // Countdown: progress fills as the day approaches.
+      final int totalDays = _periodDays(event);
+      if (totalDays > 0) {
+        final int elapsed = (totalDays - daysUntil).clamp(0, totalDays);
+        progress = ((elapsed / totalDays) * 100).round().clamp(0, 100);
+      }
+
+      if (daysUntil == 0) {
+        subtitle = 'Today! 🎉';
+        progress = 100;
+      } else if (daysUntil == 1) {
+        subtitle = 'Tomorrow – 1 day to go';
+      } else {
+        subtitle = '$daysUntil days to go';
+      }
+    } else {
+      // Count-up: days since the event.
+      final int daysSince = today.difference(nextDate).inDays.abs();
+      subtitle = '$daysSince days ago';
+      progress = 100; // already passed
+    }
 
     await _plugin.show(
-      999002,
-      title,
-      body,
-      const NotificationDetails(
+      _liveProgressId(event.id),
+      '${event.emoji} ${event.title}',
+      subtitle,
+      NotificationDetails(
         android: AndroidNotificationDetails(
           _kLiveChannel,
           'Live Event Alerts',
-          channelDescription: 'Notifies you when events are happening today',
-          importance: Importance.high,
-          priority: Priority.high,
-          styleInformation: BigTextStyleInformation(''),
+          channelDescription: 'Ongoing countdown progress for your events',
+          importance: Importance.low,   // low = no sound/heads-up, stays in shade
+          priority: Priority.low,
+          ongoing: true,               // can't be dismissed by swipe
+          onlyAlertOnce: true,         // no sound after first post
+          showProgress: true,
+          maxProgress: maxProgress,
+          progress: progress,
+          indeterminate: false,
+          styleInformation: BigTextStyleInformation(
+            subtitle,
+            contentTitle: '${event.emoji} ${event.title}',
+            summaryText: 'Daymark',
+          ),
         ),
-        iOS: DarwinNotificationDetails(
-          presentAlert: true,
-          presentBadge: true,
-          presentSound: true,
+        iOS: const DarwinNotificationDetails(
+          presentAlert: false,   // iOS: don't pop up, just update silently
+          presentBadge: false,
+          presentSound: false,
         ),
       ),
     );
   }
+
+  /// Cancels the live progress notification for a single event.
+  Future<void> cancelLiveProgressNotification(String eventId) async {
+    await _ensureInitialized();
+    if (!_isSupportedPlatform) return;
+    await _plugin.cancel(_liveProgressId(eventId));
+  }
+
+  /// Returns the total period in days for the event's recurrence,
+  /// used to compute progress towards next occurrence.
+  int _periodDays(EventModel event) {
+    switch (event.recurrence) {
+      case EventRecurrence.weekly:
+        return 7;
+      case EventRecurrence.monthly:
+        return 30;
+      case EventRecurrence.yearly:
+        return 365;
+      case EventRecurrence.once:
+        // For a one-time event, use days from creation to event date.
+        final int total = event.date
+            .difference(event.createdAt)
+            .inDays
+            .abs();
+        return total > 0 ? total : 1;
+    }
+  }
+
+  int _liveProgressId(String eventId) =>
+      (eventId.hashCode & 0x7FFFFF) + 500000;
 
   /// Schedules a daily morning notification (8 AM) summarising today's events.
   Future<void> scheduleTodayEventsNotification() async {
@@ -327,7 +450,7 @@ class NotificationService {
       scheduledDate = scheduledDate.add(const Duration(days: 1));
     }
 
-    Future<void> _doSchedule(AndroidScheduleMode mode) async {
+    Future<void> doSchedule(AndroidScheduleMode mode) async {
       await _plugin.zonedSchedule(
         999003,
         '📅 Good morning!',
@@ -350,10 +473,10 @@ class NotificationService {
     }
 
     try {
-      await _doSchedule(AndroidScheduleMode.exactAllowWhileIdle);
+      await doSchedule(AndroidScheduleMode.exactAllowWhileIdle);
     } catch (e) {
       if (e is PlatformException && e.code == 'exact_alarms_not_permitted') {
-        await _doSchedule(AndroidScheduleMode.inexactAllowWhileIdle);
+        await doSchedule(AndroidScheduleMode.inexactAllowWhileIdle);
       } else {
         rethrow;
       }

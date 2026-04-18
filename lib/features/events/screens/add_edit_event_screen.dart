@@ -32,6 +32,7 @@ class _AddEditEventScreenState extends ConsumerState<AddEditEventScreen> {
   late List<int> _reminderDays;
   late EventCountUnit _countUnit;
   late EventRecurrence _recurrence;
+  late bool _liveNotification;
 
   SuggestionResult? _pendingSuggestion;
   bool _advancedOpen = false;
@@ -74,6 +75,7 @@ class _AddEditEventScreenState extends ConsumerState<AddEditEventScreen> {
     _reminderDays = List<int>.from(e?.reminderDays ?? <int>[0, 1]);
     _countUnit = e?.countUnit ?? EventCountUnit.days;
     _recurrence = e?.recurrence ?? EventRecurrence.once;
+    _liveNotification = e?.liveNotification ?? false;
     _titleController.addListener(_onTitleChanged);
     _refreshNotificationPermissionState();
   }
@@ -729,43 +731,122 @@ class _AddEditEventScreenState extends ConsumerState<AddEditEventScreen> {
   }
 
   Widget _buildRemindersSection(BuildContext context, ColorScheme scheme) {
+    // Preset options; any custom values added by user also appear as chips.
+    const List<int> presets = <int>[0, 1, 3, 7, 14, 30];
+    final List<int> allChips = <int>{
+      ...presets,
+      ..._reminderDays.where((int d) => !presets.contains(d)),
+    }.toList()
+      ..sort();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         const _SectionLabel(icon: Icons.notifications_outlined, label: 'Reminders'),
         const SizedBox(height: 8),
         _FormCard(
-          child: Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: <int>[0, 1, 3, 7].map((int d) {
-              final bool sel = _reminderDays.contains(d);
-              return FilterChip(
-                label: Text(d == 0
-                    ? 'On event day'
-                    : '$d day${d > 1 ? 's' : ''} before'),
-                selected: sel,
-                selectedColor: scheme.primaryContainer,
-                checkmarkColor: scheme.primary,
-                backgroundColor: scheme.surfaceContainerHighest,
-                side: BorderSide(
-                  color: sel ? scheme.primary : scheme.outlineVariant,
-                  width: 1.2,
-                ),
-                labelStyle: TextStyle(
-                  color: sel ? scheme.onPrimaryContainer : scheme.onSurface,
-                  fontWeight: sel ? FontWeight.w700 : FontWeight.w500,
-                  fontSize: 13,
-                ),
-                onSelected: (bool v) => setState(() {
-                  if (v) {
-                    _reminderDays.add(d);
-                  } else {
-                    _reminderDays.remove(d);
-                  }
-                }),
-              );
-            }).toList(growable: false),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              // ── Reminder day chips ────────────────────────────────────
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: <Widget>[
+                  ...allChips.map((int d) {
+                    final bool sel = _reminderDays.contains(d);
+                    return FilterChip(
+                      label: Text(d == 0
+                          ? 'On event day'
+                          : '$d day${d > 1 ? 's' : ''} before'),
+                      selected: sel,
+                      selectedColor: scheme.primaryContainer,
+                      checkmarkColor: scheme.primary,
+                      backgroundColor: scheme.surfaceContainerHighest,
+                      side: BorderSide(
+                        color: sel ? scheme.primary : scheme.outlineVariant,
+                        width: 1.2,
+                      ),
+                      labelStyle: TextStyle(
+                        color: sel ? scheme.onPrimaryContainer : scheme.onSurface,
+                        fontWeight: sel ? FontWeight.w700 : FontWeight.w500,
+                        fontSize: 13,
+                      ),
+                      onSelected: (bool v) => setState(() {
+                        if (v) {
+                          _reminderDays.add(d);
+                        } else {
+                          _reminderDays.remove(d);
+                        }
+                      }),
+                    );
+                  }),
+                  // ── + Custom chip ────────────────────────────────────
+                  ActionChip(
+                    avatar: Icon(Icons.add_rounded,
+                        size: 16, color: scheme.primary),
+                    label: const Text('Custom'),
+                    backgroundColor: scheme.surfaceContainerHighest,
+                    side: BorderSide(color: scheme.outlineVariant, width: 1.2),
+                    labelStyle: TextStyle(
+                        color: scheme.primary,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13),
+                    onPressed: () async {
+                      final int? days = await _showCustomDayDialog(context);
+                      if (days != null && days > 0) {
+                        setState(() {
+                          if (!_reminderDays.contains(days)) {
+                            _reminderDays.add(days);
+                          }
+                        });
+                      }
+                    },
+                  ),
+                ],
+              ),
+              const Divider(height: 24),
+              // ── Live notification toggle ──────────────────────────────
+              Row(
+                children: <Widget>[
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: Colors.amber.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.show_chart_rounded,
+                        color: Colors.amber, size: 18),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Text('Live progress notification',
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleSmall
+                                ?.copyWith(fontWeight: FontWeight.w600)),
+                        Text(
+                          'Show a persistent countdown with progress bar in your notification shade',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: scheme.onSurface.withValues(alpha: 0.55),
+                              ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Switch.adaptive(
+                    value: _liveNotification,
+                    onChanged: (bool v) =>
+                        setState(() => _liveNotification = v),
+                    activeColor: scheme.primary,
+                  ),
+                ],
+              ),
+            ],
           ),
         ),
         if (_notificationPermissionChecked && !_hasNotificationPermission) ...<Widget>[
@@ -798,6 +879,42 @@ class _AddEditEventScreenState extends ConsumerState<AddEditEventScreen> {
           ),
         ],
       ],
+    );
+  }
+
+  /// Shows a dialog asking the user for a custom number of days before the event.
+  Future<int?> _showCustomDayDialog(BuildContext context) async {
+    final TextEditingController ctrl = TextEditingController();
+    return showDialog<int>(
+      context: context,
+      builder: (BuildContext ctx) {
+        return AlertDialog(
+          title: const Text('Custom reminder'),
+          content: TextField(
+            controller: ctrl,
+            keyboardType: TextInputType.number,
+            autofocus: true,
+            decoration: const InputDecoration(
+              hintText: 'e.g. 10',
+              suffixText: 'days before',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final int? v = int.tryParse(ctrl.text.trim());
+                Navigator.of(ctx).pop(v);
+              },
+              child: const Text('Add'),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -1042,6 +1159,7 @@ class _AddEditEventScreenState extends ConsumerState<AddEditEventScreen> {
         reminderDays: _reminderDays,
         countUnit: _countUnit,
         recurrence: _recurrence,
+        liveNotification: _liveNotification,
       );
     } else {
       await notifier.updateEvent(
@@ -1055,6 +1173,7 @@ class _AddEditEventScreenState extends ConsumerState<AddEditEventScreen> {
           reminderDays: _reminderDays,
           countUnit: _countUnit,
           recurrence: _recurrence,
+          liveNotification: _liveNotification,
           mode: _date.isAfter(DateTime.now())
               ? EventMode.countdown
               : EventMode.countup,

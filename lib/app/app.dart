@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/auth_service.dart';
-import '../core/constants.dart';
 import '../core/sync_service.dart';
 import '../features/notifications/notification_service.dart';
 import '../features/settings/screens/settings_screen.dart';
@@ -10,7 +9,9 @@ import '../shared/theme/app_theme.dart';
 import 'router.dart';
 
 class EventCounterApp extends ConsumerStatefulWidget {
-  const EventCounterApp({super.key});
+  const EventCounterApp({super.key, this.startupError});
+
+  final String? startupError;
 
   @override
   ConsumerState<EventCounterApp> createState() => _EventCounterAppState();
@@ -22,10 +23,15 @@ class _EventCounterAppState extends ConsumerState<EventCounterApp> {
   @override
   void initState() {
     super.initState();
-    _initializeApp();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initializeApp();
+    });
   }
 
   Future<void> _initializeApp() async {
+    if (mounted) {
+      setState(() => _isInitializing = false);
+    }
     try {
       final SyncService sync = ref.read(syncServiceProvider);
       await sync.replayPendingSync();
@@ -36,10 +42,6 @@ class _EventCounterAppState extends ConsumerState<EventCounterApp> {
       await ref.read(notificationServiceProvider).requestPermissionsOnFirstLaunch();
     } catch (e) {
       // Silently handle initialization errors
-    } finally {
-      if (mounted) {
-        setState(() => _isInitializing = false);
-      }
     }
   }
 
@@ -47,9 +49,20 @@ class _EventCounterAppState extends ConsumerState<EventCounterApp> {
   Widget build(BuildContext context) {
     final themeMode = ref.watch(themeModeProvider);
 
+    if (widget.startupError != null) {
+      return MaterialApp(
+        title: 'Event Counter',
+        theme: AppTheme.light(),
+        darkTheme: AppTheme.dark(),
+        themeMode: themeMode,
+        debugShowCheckedModeBanner: false,
+        home: _StartupFailureScreen(errorText: widget.startupError!),
+      );
+    }
+
     if (_isInitializing) {
       return MaterialApp(
-        title: AppConstants.appName,
+        title: 'Event Counter',
         theme: AppTheme.light(),
         darkTheme: AppTheme.dark(),
         themeMode: themeMode,
@@ -61,7 +74,7 @@ class _EventCounterAppState extends ConsumerState<EventCounterApp> {
     final router = ref.watch(routerProvider);
 
     return MaterialApp.router(
-      title: AppConstants.appName,
+      title: 'Event Counter',
       theme: AppTheme.light(),
       darkTheme: AppTheme.dark(),
       themeMode: themeMode,
@@ -76,41 +89,52 @@ class _AppLoadingScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ColorScheme scheme = Theme.of(context).colorScheme;
+    return const Scaffold(
+      body: Center(
+        child: CircularProgressIndicator(),
+      ),
+    );
+  }
+}
+
+class _StartupFailureScreen extends StatelessWidget {
+  const _StartupFailureScreen({required this.errorText});
+
+  final String errorText;
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                Image.asset(
-                  AppConstants.logoAssetPath,
-                  width: 84,
-                  height: 84,
-                ),
-                const SizedBox(height: 14),
-                Text(
-                  AppConstants.appName,
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  AppConstants.loadingCaption,
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: scheme.onSurface.withValues(alpha: 0.7),
-                      ),
-                ),
-                const SizedBox(height: 20),
-                const CircularProgressIndicator(),
-              ],
-            ),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              const Icon(Icons.error_outline, size: 48),
+              const SizedBox(height: 12),
+              const Text(
+                'Startup failed',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Daymark could not finish initialization. Please restart the app.',
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                errorText,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
           ),
         ),
       ),
     );
   }
 }
+
+
 

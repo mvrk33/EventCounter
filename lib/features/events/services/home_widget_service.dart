@@ -42,7 +42,51 @@ class WidgetKeys {
 }
 
 class EventHomeWidgetService {
-  const EventHomeWidgetService();
+  EventHomeWidgetService() {
+    _initCachedConfig();
+  }
+
+  // Cache to avoid repeated HomeWidget reads
+  late String _cachedEventMode;
+  late bool _cachedTransparent;
+  late String _cachedBgColor;
+  late String _cachedTextColor;
+  late bool _cachedShowEmoji;
+  late bool _cachedShowTitle;
+  late String _cachedCountUnit;
+  bool _configLoaded = false;
+
+  Future<void> _initCachedConfig() async {
+    if (_configLoaded || kIsWeb) return;
+    try {
+      _cachedEventMode =
+          await HomeWidget.getWidgetData<String>(WidgetKeys.cfgEventMode) ??
+              'nearest';
+      _cachedTransparent =
+          await HomeWidget.getWidgetData<bool>(WidgetKeys.cfgTransparent) ??
+              false;
+      _cachedBgColor =
+          await HomeWidget.getWidgetData<String>(WidgetKeys.cfgBgColor) ??
+              '#CC5E6AD2';
+      _cachedTextColor =
+          await HomeWidget.getWidgetData<String>(WidgetKeys.cfgTextColor) ??
+              '#FFFFFFFF';
+      _cachedShowEmoji =
+          await HomeWidget.getWidgetData<bool>(WidgetKeys.cfgShowEmoji) ?? true;
+      _cachedShowTitle =
+          await HomeWidget.getWidgetData<bool>(WidgetKeys.cfgShowTitle) ?? true;
+      _cachedCountUnit =
+          await HomeWidget.getWidgetData<String>(WidgetKeys.cfgCountUnit) ??
+              'days';
+      _configLoaded = true;
+    } catch (_) {
+      // Defaults are set by the ?? operators above
+    }
+  }
+
+  void invalidateCache() {
+    _configLoaded = false;
+  }
 
   // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -116,30 +160,14 @@ class EventHomeWidgetService {
     if (kIsWeb) return;
 
     try {
-      // Read global config
-      final String eventMode =
-          await HomeWidget.getWidgetData<String>(WidgetKeys.cfgEventMode) ??
-              'nearest';
-      final bool transparent =
-          await HomeWidget.getWidgetData<bool>(WidgetKeys.cfgTransparent) ??
-              false;
-      final String bgColor =
-          await HomeWidget.getWidgetData<String>(WidgetKeys.cfgBgColor) ??
-              '#CC5E6AD2';
-      final String textColor =
-          await HomeWidget.getWidgetData<String>(WidgetKeys.cfgTextColor) ??
-              '#FFFFFFFF';
-      final bool showEmoji =
-          await HomeWidget.getWidgetData<bool>(WidgetKeys.cfgShowEmoji) ?? true;
-      final bool showTitle =
-          await HomeWidget.getWidgetData<bool>(WidgetKeys.cfgShowTitle) ?? true;
-      final String countUnitCfg =
-          await HomeWidget.getWidgetData<String>(WidgetKeys.cfgCountUnit) ??
-              'days';
+      // Ensure config is loaded
+      if (!_configLoaded) {
+        await _initCachedConfig();
+      }
 
       // Select the event to display
       EventModel? target;
-      if (eventMode == 'pinned') {
+      if (_cachedEventMode == 'pinned') {
         target = events.where((EventModel e) => e.isPinned).firstOrNull;
       }
       target ??= _nearestUpcoming(events);
@@ -147,11 +175,11 @@ class EventHomeWidgetService {
       final String title = target?.title ?? 'No events';
       final String emoji = target?.emoji ?? '🗓️';
       int countNum = 0;
-      String countUnit = countUnitCfg;
+      String countUnit = _cachedCountUnit;
       String countDir = 'left';
 
       if (target != null) {
-        final _DisplayData d = _computeDisplay(target, countUnitCfg);
+        final _DisplayData d = _computeDisplay(target, _cachedCountUnit);
         countNum = d.countNum;
         countUnit = d.countUnit;
         countDir = d.countDir;
@@ -164,11 +192,14 @@ class EventHomeWidgetService {
       await HomeWidget.saveWidgetData<String>(WidgetKeys.countDir, countDir);
       await HomeWidget.saveWidgetData<String>(WidgetKeys.emoji, emoji);
       await HomeWidget.saveWidgetData<bool>(
-          WidgetKeys.transparent, transparent);
-      await HomeWidget.saveWidgetData<String>(WidgetKeys.bgColor, bgColor);
-      await HomeWidget.saveWidgetData<bool>(WidgetKeys.showEmoji, showEmoji);
-      await HomeWidget.saveWidgetData<bool>(WidgetKeys.showTitle, showTitle);
-      await HomeWidget.saveWidgetData<String>(WidgetKeys.textColor, textColor);
+          WidgetKeys.transparent, _cachedTransparent);
+      await HomeWidget.saveWidgetData<String>(WidgetKeys.bgColor, _cachedBgColor);
+      await HomeWidget.saveWidgetData<bool>(
+          WidgetKeys.showEmoji, _cachedShowEmoji);
+      await HomeWidget.saveWidgetData<bool>(
+          WidgetKeys.showTitle, _cachedShowTitle);
+      await HomeWidget.saveWidgetData<String>(
+          WidgetKeys.textColor, _cachedTextColor);
 
       // ── Also update per-widget keys for every known non-specific widget ──
       final String knownIdsStr =
@@ -189,16 +220,17 @@ class EventHomeWidgetService {
               'w_${id}_count_dir', countDir);
           await HomeWidget.saveWidgetData<String>('w_${id}_emoji', emoji);
           await HomeWidget.saveWidgetData<bool>(
-              'w_${id}_transparent', transparent);
-          await HomeWidget.saveWidgetData<String>('w_${id}_bg_color', bgColor);
-          await HomeWidget.saveWidgetData<bool>(
-              'w_${id}_show_emoji', showEmoji);
-          await HomeWidget.saveWidgetData<bool>(
-              'w_${id}_show_title', showTitle);
+              'w_${id}_transparent', _cachedTransparent);
           await HomeWidget.saveWidgetData<String>(
-              'w_${id}_text_color', textColor);
+              'w_${id}_bg_color', _cachedBgColor);
+          await HomeWidget.saveWidgetData<bool>(
+              'w_${id}_show_emoji', _cachedShowEmoji);
+          await HomeWidget.saveWidgetData<bool>(
+              'w_${id}_show_title', _cachedShowTitle);
           await HomeWidget.saveWidgetData<String>(
-              'w_${id}_event_mode', eventMode);
+              'w_${id}_text_color', _cachedTextColor);
+          await HomeWidget.saveWidgetData<String>(
+              'w_${id}_event_mode', _cachedEventMode);
         }
       }
 

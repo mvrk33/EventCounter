@@ -13,24 +13,41 @@ import '../../events/providers/events_provider.dart';
 import '../../events/services/export_service.dart';
 import 'account_screen.dart';
 
+typedef ShareFilesCallback = Future<void> Function(List<XFile> files);
+
 final StateProvider<ThemeMode> themeModeProvider =
     StateProvider<ThemeMode>((Ref ref) {
   return ThemeMode.system;
 });
 
 class SettingsScreen extends ConsumerStatefulWidget {
-  const SettingsScreen({super.key});
+  const SettingsScreen({
+    this.exportService,
+    this.shareFiles,
+    super.key,
+  });
+
+  final ExportService? exportService;
+  final ShareFilesCallback? shareFiles;
 
   @override
   ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
 }
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
-  final ExportService _exportService = const ExportService();
+  late final ExportService _exportService;
+  late final ShareFilesCallback _shareFiles;
   int _developerTapCount = 0;
   Timer? _developerTapReset;
 
   static final Uri _githubUri = Uri.parse('https://github.com/mvrk33');
+
+  @override
+  void initState() {
+    super.initState();
+    _exportService = widget.exportService ?? const ExportService();
+    _shareFiles = widget.shareFiles ?? Share.shareXFiles;
+  }
 
   @override
   void dispose() {
@@ -163,7 +180,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
                 const SizedBox(height: 20),
                 // ...existing code...
-                _SectionHeader(label: 'APPEARANCE'),
+                const _SectionHeader(label: 'APPEARANCE'),
                 const SizedBox(height: 8),
                 _SettingsGroup(
                   children: <Widget>[
@@ -213,7 +230,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ],
                 ),
                 const SizedBox(height: 20),
-                _SectionHeader(label: 'DATA'),
+                const _SectionHeader(label: 'DATA'),
                 const SizedBox(height: 8),
                 _SettingsGroup(
                   children: <Widget>[
@@ -231,8 +248,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                   events,
                                   security: pinSecurity,
                                 );
-                                await Share.shareXFiles(
-                                    <XFile>[XFile(file.path)]);
+                                await _shareFiles(<XFile>[XFile(file.path)]);
                               },
                         child: const Text('Export'),
                       ),
@@ -249,8 +265,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             : () async {
                                 final file = await _exportService
                                     .exportEventsCsv(events);
-                                await Share.shareXFiles(
-                                    <XFile>[XFile(file.path)]);
+                                await _shareFiles(<XFile>[XFile(file.path)]);
                               },
                         child: const Text('Export'),
                       ),
@@ -259,33 +274,33 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     _SettingsRow(
                       icon: Icons.download_rounded,
                       iconColor: const Color(0xFFE53935),
-                      title: 'Import from JSON',
-                      subtitle: 'Restore a backup file',
+                      title: 'Import backup file',
+                      subtitle: 'Auto-detects JSON, encrypted JSON, and CSV',
                       trailing: OutlinedButton(
                         onPressed: () async {
-                          final imported = await _exportService
-                              .importEventsJsonFromPicker(
+                          final ScaffoldMessengerState messenger =
+                              ScaffoldMessenger.of(context);
+                          final imported =
+                              await _exportService.importEventsJsonFromPicker(
                             security: pinSecurity,
                           );
                           if (imported.isEmpty) {
-                            if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                    content: Text('No JSON backup selected or readable.')),
-                              );
-                            }
+                            messenger.showSnackBar(
+                              const SnackBar(
+                                  content: Text(
+                                      'No backup selected, unsupported format, or encrypted with a different key.')),
+                            );
                             return;
                           }
                           await ref
                               .read(eventsProvider.notifier)
                               .importEvents(imported);
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                  content: Text(
-                                      'Imported ${imported.length} events.')),
-                            );
-                          }
+                          if (!mounted) return;
+                          messenger.showSnackBar(
+                            SnackBar(
+                                content: Text(
+                                    'Imported ${imported.length} events.')),
+                          );
                         },
                         child: const Text('Import'),
                       ),
@@ -293,7 +308,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ],
                 ),
                 const SizedBox(height: 20),
-                _SectionHeader(label: 'SECURITY'),
+                const _SectionHeader(label: 'SECURITY'),
                 const SizedBox(height: 8),
                 _SettingsGroup(
                   children: <Widget>[
@@ -301,8 +316,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       icon: Icons.lock_rounded,
                       iconColor: const Color(0xFF5E35B1),
                       title: 'Encrypt local backup file',
-                      subtitle:
-                          'Protects exported JSON backup in app documents',
+                      subtitle: 'On by default for new backup exports',
                       trailing: Switch(
                         value: localEncryptionEnabled,
                         onChanged: (bool value) =>
@@ -325,7 +339,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ],
                 ),
                 const SizedBox(height: 20),
-                _SectionHeader(label: 'ABOUT'),
+                const _SectionHeader(label: 'ABOUT'),
                 const SizedBox(height: 8),
                 _SettingsGroup(
                   children: <Widget>[
@@ -336,9 +350,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       subtitle: 'Event Counter v1.0.0',
                     ),
                     _SettingsDivider(),
-                    _SettingsRow(
+                    const _SettingsRow(
                       icon: Icons.balance_rounded,
-                      iconColor: const Color(0xFF8E24AA),
+                      iconColor: Color(0xFF8E24AA),
                       title: 'License',
                       subtitle: 'MIT License',
                     ),

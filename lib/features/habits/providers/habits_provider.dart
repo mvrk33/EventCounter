@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:uuid/uuid.dart';
+import 'package:flutter/foundation.dart';
 
 import '../../../core/hive_boxes.dart';
 import '../../../core/sync_service.dart';
@@ -26,14 +27,29 @@ class HabitsNotifier extends StateNotifier<List<HabitModel>> {
         _syncService = syncService,
         _uuid = uuid,
         super(box.values.toList(growable: false)) {
-    _box.listenable().addListener(() {
-      state = _box.values.toList(growable: false);
-    });
+    _listenBox();
   }
 
   final Box<HabitModel> _box;
   final SyncService _syncService;
   final Uuid _uuid;
+  late final ValueListenable<Box<HabitModel>> _boxListenable = _box.listenable();
+  VoidCallback? _boxListener;
+
+  void _listenBox() {
+    _boxListener = () {
+      state = _box.values.toList(growable: false);
+    };
+    _boxListenable.addListener(_boxListener!);
+  }
+
+  @override
+  void dispose() {
+    if (_boxListener != null) {
+      _boxListenable.removeListener(_boxListener!);
+    }
+    super.dispose();
+  }
 
   Future<void> addHabit({
     required String title,

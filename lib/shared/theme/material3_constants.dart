@@ -104,9 +104,9 @@ class Material3BorderRadius {
         top: Radius.circular(Material3Constants.extraLargeBorderRadius),
       );
 
-  static BorderRadius allExceptBottom() => BorderRadius.only(
-        topLeft: const Radius.circular(Material3Constants.extraLargeBorderRadius),
-        topRight: const Radius.circular(Material3Constants.extraLargeBorderRadius),
+  static BorderRadius allExceptBottom() => const BorderRadius.only(
+        topLeft: Radius.circular(Material3Constants.extraLargeBorderRadius),
+        topRight: Radius.circular(Material3Constants.extraLargeBorderRadius),
       );
 }
 

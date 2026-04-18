@@ -56,6 +56,7 @@ class EventFields {
   static const String createdAt = 'createdAt';
   static const String updatedAt = 'updatedAt';
   static const String recurrence = 'recurrence';
+  static const String liveNotification = 'liveNotification';
 }
 
 class EventModel {
@@ -74,6 +75,7 @@ class EventModel {
     required this.createdAt,
     required this.updatedAt,
     this.recurrence = EventRecurrence.once,
+    this.liveNotification = false,
   });
 
   final String id;
@@ -90,6 +92,8 @@ class EventModel {
   final DateTime createdAt;
   final DateTime updatedAt;
   final EventRecurrence recurrence;
+  /// Whether this event shows a persistent live-progress notification.
+  final bool liveNotification;
 
   /// For recurring events returns the next future occurrence of this date.
   /// For one-time events returns [date] unchanged.
@@ -140,6 +144,7 @@ class EventModel {
     DateTime? createdAt,
     DateTime? updatedAt,
     EventRecurrence? recurrence,
+    bool? liveNotification,
   }) {
     return EventModel(
       id: id ?? this.id,
@@ -156,6 +161,7 @@ class EventModel {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       recurrence: recurrence ?? this.recurrence,
+      liveNotification: liveNotification ?? this.liveNotification,
     );
   }
 
@@ -175,6 +181,7 @@ class EventModel {
       EventFields.createdAt: createdAt,
       EventFields.updatedAt: updatedAt,
       EventFields.recurrence: recurrence.name,
+      EventFields.liveNotification: liveNotification,
     };
   }
 
@@ -194,6 +201,7 @@ class EventModel {
       EventFields.createdAt: Timestamp.fromDate(createdAt),
       EventFields.updatedAt: Timestamp.fromDate(updatedAt),
       EventFields.recurrence: recurrence.name,
+      EventFields.liveNotification: liveNotification,
     };
   }
 
@@ -213,6 +221,7 @@ class EventModel {
       EventFields.createdAt: createdAt.toIso8601String(),
       EventFields.updatedAt: updatedAt.toIso8601String(),
       EventFields.recurrence: recurrence.name,
+      EventFields.liveNotification: liveNotification,
     };
   }
 
@@ -238,6 +247,7 @@ class EventModel {
       createdAt: _parseDate(map[EventFields.createdAt]),
       updatedAt: _parseDate(map[EventFields.updatedAt]),
       recurrence: _parseRecurrence(map[EventFields.recurrence]),
+      liveNotification: (map[EventFields.liveNotification] as bool?) ?? false,
     );
   }
 
@@ -310,13 +320,15 @@ class EventModelAdapter extends TypeAdapter<EventModel> {
       recurrence: fields[13] == null
           ? EventRecurrence.once
           : EventRecurrence.values[fields[13] as int],
+      // field 14 added in v3 – default false for older records
+      liveNotification: (fields[14] as bool?) ?? false,
     );
   }
 
   @override
   void write(BinaryWriter writer, EventModel obj) {
     writer
-      ..writeByte(14) // total fields
+      ..writeByte(15) // total fields
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -344,6 +356,8 @@ class EventModelAdapter extends TypeAdapter<EventModel> {
       ..writeByte(12)
       ..write(obj.isPinned)
       ..writeByte(13)
-      ..write(obj.recurrence.index);
+      ..write(obj.recurrence.index)
+      ..writeByte(14)
+      ..write(obj.liveNotification);
   }
 }

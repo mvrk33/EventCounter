@@ -14,13 +14,16 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
   ref.onDispose(refresh.dispose);
 
   final GoRouter router = GoRouter(
-    initialLocation: '/home',
+    initialLocation: '/login',
     refreshListenable: refresh,
     redirect: (context, state) {
       final bool isSignedIn = ref.read(authServiceProvider).isSignedIn;
       final bool isOnLogin = state.matchedLocation == '/login';
       if (isSignedIn && isOnLogin) {
         return '/home';
+      }
+      if (!isSignedIn && !isOnLogin) {
+        return '/login';
       }
       return null;
     },

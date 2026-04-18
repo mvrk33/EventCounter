@@ -84,7 +84,7 @@ class StreakCalendar extends StatelessWidget {
                         : null,
                   ),
                   child: checked
-                      ? Icon(
+                      ? const Icon(
                           Icons.check_rounded,
                           size: 14,
                           color: Colors.white,

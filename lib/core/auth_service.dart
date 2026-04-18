@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
@@ -18,7 +21,8 @@ class AuthService {
       '469114218525-l169tmdmmg0uavkk5q6svuq9c4m72isv.apps.googleusercontent.com';
 
   AuthService({FirebaseAuth? firebaseAuth, GoogleSignIn? googleSignIn})
-      : _auth = firebaseAuth ?? FirebaseAuth.instance,
+      : _auth = firebaseAuth ??
+            (Firebase.apps.isNotEmpty ? FirebaseAuth.instance : null),
         // serverClientId must match the client_type:3 (Web client) OAuth ID
         // from your google-services.json. This is required for Firebase Auth
         // to receive a valid idToken on Android (prevents ApiException 10).
@@ -28,14 +32,22 @@ class AuthService {
               serverClientId: _googleServerClientId,
             );
 
-  final FirebaseAuth _auth;
+  final FirebaseAuth? _auth;
   final GoogleSignIn _googleSignIn;
+
+  FirebaseAuth _requireAuth() {
+    final FirebaseAuth? auth = _auth;
+    if (auth == null || !_firebaseReady) {
+      throw StateError('Firebase is not configured.');
+    }
+    return auth;
+  }
 
   User? get currentUser {
     if (!_firebaseReady) {
       return null;
     }
-    return _auth.currentUser;
+    return _auth?.currentUser;
   }
 
   bool get isSignedIn => currentUser != null;
@@ -44,59 +56,94 @@ class AuthService {
     if (!_firebaseReady) {
       return Stream<User?>.value(null);
     }
-    return _auth.authStateChanges();
+    return _auth?.authStateChanges() ?? Stream<User?>.value(null);
   }
 
   bool get _firebaseReady => Firebase.apps.isNotEmpty;
 
+  Future<User> _awaitAuthenticatedUser({String? expectedUid}) async {
+    final FirebaseAuth auth = _requireAuth();
+
+    User? currentUser = auth.currentUser;
+    if (currentUser == null ||
+        (expectedUid != null && currentUser.uid != expectedUid)) {
+      currentUser = await auth
+          .authStateChanges()
+          .where((User? value) =>
+              value != null && (expectedUid == null || value.uid == expectedUid))
+          .cast<User>()
+          .first
+          .timeout(
+            const Duration(seconds: 8),
+            onTimeout: () => throw StateError(
+              'Timed out waiting for Firebase Authentication state to settle.',
+            ),
+          );
+    }
+
+    // Force-refresh once so Firestore gets an authenticated request.auth context.
+    await currentUser.getIdToken(true);
+    return currentUser;
+  }
+
   // Starts Google OAuth and signs into Firebase when available.
   Future<UserCredential?> signInWithGoogle() async {
-    if (!_firebaseReady) {
-      throw StateError('Firebase is not configured.');
-    }
+    final FirebaseAuth auth = _requireAuth();
 
-    final GoogleSignInAccount? account = await _googleSignIn.signIn();
-    if (account == null) {
-      // User cancelled the sign-in flow.
-      return null;
-    }
-    final GoogleSignInAuthentication googleAuth = await account.authentication;
+    try {
+      final GoogleSignInAccount? account = await _googleSignIn.signIn();
+      if (account == null) {
+        // User cancelled the sign-in flow.
+        return null;
+      }
+      final GoogleSignInAuthentication googleAuth = await account.authentication;
 
-    // idToken is null when the SHA-1 fingerprint is not registered in the
-    // Firebase console or when google-services.json is misconfigured.
-    if (googleAuth.idToken == null) {
-      await _googleSignIn.signOut();
-      throw StateError(
-        'Google Sign-In returned a null idToken. '
-        'Make sure the SHA-1 certificate fingerprint is registered in the '
-        'Firebase console and that google-services.json is up to date.',
+      // idToken is null when the SHA-1 fingerprint is not registered in the
+      // Firebase console or when google-services.json is misconfigured.
+      if (googleAuth.idToken == null) {
+        await _googleSignIn.signOut();
+        throw StateError(
+          'Google Sign-In returned a null idToken. '
+          'Make sure the SHA-1 certificate fingerprint is registered in the '
+          'Firebase console and that google-services.json is up to date. '
+          'Error: DEVELOPER_ERROR typically means certificate SHA-1 mismatch. '
+          'Debug keystore: ~/.android/debug.keystore',
+        );
+      }
+
+
+      final OAuthCredential credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
       );
+
+      final UserCredential userCredential =
+          await auth.signInWithCredential(credential);
+      final User user =
+          await _awaitAuthenticatedUser(expectedUid: userCredential.user?.uid);
+      await _upsertProfile(user);
+      return userCredential;
+    } catch (e) {
+      debugPrint('Google Sign-In error: $e');
+      rethrow;
     }
-
-    final OAuthCredential credential = GoogleAuthProvider.credential(
-      accessToken: googleAuth.accessToken,
-      idToken: googleAuth.idToken,
-    );
-
-    final UserCredential userCredential = await _auth.signInWithCredential(credential);
-    await _upsertProfile(userCredential.user);
-    return userCredential;
   }
 
   Future<UserCredential> signInWithEmailPassword({
     required String email,
     required String password,
   }) async {
-    if (!_firebaseReady) {
-      throw StateError('Firebase is not configured.');
-    }
+    final FirebaseAuth auth = _requireAuth();
 
     final String normalizedEmail = email.trim();
-    final UserCredential userCredential = await _auth.signInWithEmailAndPassword(
+    final UserCredential userCredential =
+        await auth.signInWithEmailAndPassword(
       email: normalizedEmail,
       password: password,
     );
-    await _upsertProfile(userCredential.user);
+    final User user =
+        await _awaitAuthenticatedUser(expectedUid: userCredential.user?.uid);
+    await _upsertProfile(user);
     return userCredential;
   }
 
@@ -105,39 +152,35 @@ class AuthService {
     required String password,
     String? displayName,
   }) async {
-    if (!_firebaseReady) {
-      throw StateError('Firebase is not configured.');
-    }
+    final FirebaseAuth auth = _requireAuth();
 
     final String normalizedEmail = email.trim();
-    final UserCredential userCredential = await _auth.createUserWithEmailAndPassword(
+    final UserCredential userCredential = await auth.createUserWithEmailAndPassword(
       email: normalizedEmail,
       password: password,
     );
 
-    final User? user = userCredential.user;
+    final User? createdUser = userCredential.user;
     final String trimmedName = (displayName ?? '').trim();
-    if (user != null && trimmedName.isNotEmpty) {
-      await user.updateDisplayName(trimmedName);
-      await user.reload();
+    if (createdUser != null && trimmedName.isNotEmpty) {
+      await createdUser.updateDisplayName(trimmedName);
+      await createdUser.reload();
     }
 
-    await _upsertProfile(_auth.currentUser ?? userCredential.user);
+    final User user =
+        await _awaitAuthenticatedUser(expectedUid: userCredential.user?.uid);
+    await _upsertProfile(user);
     return userCredential;
   }
 
   Future<void> sendPasswordResetEmail(String email) async {
-    if (!_firebaseReady) {
-      throw StateError('Firebase is not configured.');
-    }
-    await _auth.sendPasswordResetEmail(email: email.trim());
+    final FirebaseAuth auth = _requireAuth();
+    await auth.sendPasswordResetEmail(email: email.trim());
   }
 
   // Uses Apple credential with Firebase OAuth provider.
   Future<UserCredential?> signInWithApple() async {
-    if (!_firebaseReady) {
-      throw StateError('Firebase is not configured.');
-    }
+    final FirebaseAuth auth = _requireAuth();
 
     final bool appleAvailable = await SignInWithApple.isAvailable();
     if (!appleAvailable) {
@@ -161,16 +204,20 @@ class AuthService {
       accessToken: appleCredential.authorizationCode,
     );
 
-    final UserCredential userCredential = await _auth.signInWithCredential(credential);
-    await _upsertProfile(userCredential.user);
+    final UserCredential userCredential =
+        await auth.signInWithCredential(credential);
+    final User user =
+        await _awaitAuthenticatedUser(expectedUid: userCredential.user?.uid);
+    await _upsertProfile(user);
     return userCredential;
   }
 
   Future<void> signOut() async {
-    if (!_firebaseReady) {
+    final FirebaseAuth? auth = _auth;
+    if (!_firebaseReady || auth == null) {
       return;
     }
-    await _auth.signOut();
+    await auth.signOut();
     try {
       await _googleSignIn.signOut();
     } catch (_) {
@@ -180,11 +227,12 @@ class AuthService {
 
   // Deletes cloud data first, then deletes the auth user.
   Future<void> deleteAccount() async {
-    if (!_firebaseReady) {
+    final FirebaseAuth? auth = _auth;
+    if (!_firebaseReady || auth == null) {
       return;
     }
 
-    final User? user = _auth.currentUser;
+    final User? user = auth.currentUser;
     if (user == null) {
       return;
     }

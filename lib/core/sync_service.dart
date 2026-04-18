@@ -56,6 +56,7 @@ class SyncService {
   final Box<HabitModel>? _habitsBox;
   final Box<dynamic>? _syncMetaBox;
   final Connectivity _connectivity;
+  bool _cloudSyncBlocked = false;
 
   String _autoRestoreDisabledKeyForCurrentUser() {
     final String uid = _authService.currentUser?.uid ?? 'guest';
@@ -117,7 +118,8 @@ class SyncService {
 
       await _setLastSyncedNow();
       _showSnackBar(messenger, 'Cloud backup cleared (events/habits only).');
-    } catch (_) {
+    } catch (error) {
+      debugPrint('Failed to clear cloud backup: $error');
       _showSnackBar(messenger, 'Failed to clear cloud backup.');
     }
   }
@@ -126,27 +128,44 @@ class SyncService {
     if (!_canCloudSync()) {
       return const CloudBackupSummary(eventsCount: 0, habitsCount: 0);
     }
+    final FirebaseFirestore? firestore = _firestore;
+    if (firestore == null) {
+      return const CloudBackupSummary(eventsCount: 0, habitsCount: 0);
+    }
 
     try {
       final String uid = _authService.currentUser!.uid;
-      final QuerySnapshot<Map<String, dynamic>> eventsSnapshot =
-          await _firestore!
+      // Run queries in parallel for better latency (vs sequential)
+      final Future<QuerySnapshot<Map<String, dynamic>>> eventsFuture =
+          firestore
               .collection('users')
               .doc(uid)
               .collection('events')
               .get();
-      final QuerySnapshot<Map<String, dynamic>> habitsSnapshot =
-          await _firestore
+      final Future<QuerySnapshot<Map<String, dynamic>>> habitsFuture =
+          firestore
               .collection('users')
               .doc(uid)
               .collection('habits')
               .get();
 
-      return CloudBackupSummary(
-        eventsCount: eventsSnapshot.docs.length,
-        habitsCount: habitsSnapshot.docs.length,
+      // Execute both in parallel instead of waiting for first to complete
+      final List<QuerySnapshot<Map<String, dynamic>>> results =
+          await Future.wait<QuerySnapshot<Map<String, dynamic>>>(
+        <Future<QuerySnapshot<Map<String, dynamic>>>>[
+          eventsFuture,
+          habitsFuture,
+        ],
       );
-    } catch (_) {
+      final int eventsCount = results[0].docs.length;
+      final int habitsCount = results[1].docs.length;
+
+      return CloudBackupSummary(
+        eventsCount: eventsCount,
+        habitsCount: habitsCount,
+      );
+    } catch (error) {
+      _disableCloudSyncIfDatabaseMissing(error);
       return const CloudBackupSummary(eventsCount: 0, habitsCount: 0);
     }
   }
@@ -199,7 +218,9 @@ class SyncService {
       await batch.commit();
       await _setLastSyncedNow();
       _showSnackBar(messenger, 'Sync completed successfully.');
-    } catch (_) {
+    } catch (error) {
+      debugPrint('Sync all failed: $error');
+      _disableCloudSyncIfDatabaseMissing(error);
       _showSnackBar(messenger, 'Sync failed. Will retry when online.');
       await _enqueuePendingSync();
     }
@@ -257,7 +278,9 @@ class SyncService {
 
       await _setLastSyncedNow();
       _showSnackBar(messenger, 'Restore completed.');
-    } catch (_) {
+    } catch (error) {
+      debugPrint('Restore all failed: $error');
+      _disableCloudSyncIfDatabaseMissing(error);
       _showSnackBar(messenger, 'Restore failed.');
     }
   }
@@ -331,18 +354,40 @@ class SyncService {
     }
     final List<ConnectivityResult> connectivity =
         await _connectivity.checkConnectivity();
-    if (!connectivity
-        .any((ConnectivityResult e) => e != ConnectivityResult.none)) {
+    // Check if device is online (has ANY connection that is NOT none)
+    if (connectivity.every((ConnectivityResult e) => e == ConnectivityResult.none)) {
       return;
     }
-    await syncAll();
-    if (_syncMetaBox != null) {
-      await _syncMetaBox.put('pending_sync', false);
+    try {
+      await syncAll();
+      if (_syncMetaBox != null) {
+        await _syncMetaBox.put('pending_sync', false);
+      }
+    } catch (e) {
+      debugPrint('Pending sync replay failed: $e');
+      // Keep pending_sync flag set to retry later
     }
   }
 
   bool _canCloudSync() {
-    return _firestore != null && _authService.isSignedIn;
+    return !_cloudSyncBlocked && _firestore != null && _authService.isSignedIn;
+  }
+
+  void _disableCloudSyncIfDatabaseMissing(Object error) {
+    final bool isFirebaseError = error is FirebaseException;
+    if (!isFirebaseError) {
+      return;
+    }
+
+    final FirebaseException firebaseError = error;
+    final String message = (firebaseError.message ?? '').toLowerCase();
+    final bool missingDefaultDatabase =
+        firebaseError.code == 'not-found' && message.contains('database (default) does not exist');
+    if (missingDefaultDatabase) {
+      _cloudSyncBlocked = true;
+      _syncMetaBox?.put('pending_sync', false);
+      _syncMetaBox?.put('cloud_sync_blocked_missing_firestore', true);
+    }
   }
 
   bool get _shouldEncryptCloud =>

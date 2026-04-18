@@ -1,1 +1,24 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"daymark-event-counter","appId":"1:194429762916:android:d3ebb7037af3d5f9618e71","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"daymark-event-counter","configurations":{"android":"1:194429762916:android:d3ebb7037af3d5f9618e71","ios":"1:194429762916:ios:5699cbbab0cdbae8618e71"}}}}}}
+{
+  "firestore": {
+    "rules": "firestore.rules"
+  },
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "mvrk-event-counter-5cdae",
+          "appId": "1:469114218525:android:691f7e3f872cf1fce8bef4",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "mvrk-event-counter-5cdae",
+          "configurations": {
+            "android": "1:469114218525:android:691f7e3f872cf1fce8bef4"
+          }
+        }
+      }
+    }
+  }
+}

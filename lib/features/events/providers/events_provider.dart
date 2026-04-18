@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:uuid/uuid.dart';
@@ -16,7 +19,7 @@ final StateNotifierProvider<EventsNotifier, List<EventModel>> eventsProvider =
     box: Hive.box<EventModel>(HiveBoxes.events),
     syncService: ref.read(syncServiceProvider),
     notificationService: ref.read(notificationServiceProvider),
-    homeWidgetService: const EventHomeWidgetService(),
+    homeWidgetService: EventHomeWidgetService(),
     uuid: ref.read(uuidProvider),
   );
 });
@@ -42,14 +45,45 @@ class EventsNotifier extends StateNotifier<List<EventModel>> {
   final NotificationService _notificationService;
   final EventHomeWidgetService _homeWidgetService;
   final Uuid _uuid;
+  late final ValueListenable<Box<EventModel>> _boxListenable = _box.listenable();
+  Timer? _sideEffectsDebounce;
+  VoidCallback? _boxListener;
+  int _lastSideEffectsHash = 0;
 
   void _listenBox() {
-    _box.listenable().addListener(() {
+    _boxListener = () {
       final List<EventModel> list = _box.values.toList(growable: false)
         ..sort((EventModel a, EventModel b) => a.date.compareTo(b.date));
       state = list;
+      _scheduleSideEffects(list);
+    };
+    _boxListenable.addListener(_boxListener!);
+  }
+
+  void _scheduleSideEffects(List<EventModel> list) {
+    final int sideEffectsHash = Object.hashAll(
+      list.map((EventModel e) => Object.hash(e.id, e.updatedAt.millisecondsSinceEpoch)),
+    );
+    if (sideEffectsHash == _lastSideEffectsHash) {
+      return;
+    }
+    _lastSideEffectsHash = sideEffectsHash;
+
+    _sideEffectsDebounce?.cancel();
+    _sideEffectsDebounce = Timer(const Duration(milliseconds: 250), () {
       _homeWidgetService.pushEvents(list);
+      // Update live "today's events" notification whenever events change.
+      _notificationService.showLiveEventNotification(list).ignore();
     });
+  }
+
+  @override
+  void dispose() {
+    _sideEffectsDebounce?.cancel();
+    if (_boxListener != null) {
+      _boxListenable.removeListener(_boxListener!);
+    }
+    super.dispose();
   }
 
   // Creates a local-first event and syncs in background.
@@ -63,6 +97,7 @@ class EventsNotifier extends StateNotifier<List<EventModel>> {
     required List<int> reminderDays,
     required EventCountUnit countUnit,
     EventRecurrence recurrence = EventRecurrence.once,
+    bool liveNotification = false,
   }) async {
     final DateTime now = DateTime.now();
     final EventMode mode = date.isAfter(now) ? EventMode.countdown : EventMode.countup;
@@ -78,6 +113,7 @@ class EventsNotifier extends StateNotifier<List<EventModel>> {
       reminderDays: reminderDays,
       countUnit: countUnit,
       recurrence: recurrence,
+      liveNotification: liveNotification,
       createdAt: now,
       updatedAt: now,
     );
@@ -96,7 +132,12 @@ class EventsNotifier extends StateNotifier<List<EventModel>> {
   }
 
   Future<void> deleteEvent(String id) async {
-    await _notificationService.cancelEventReminders(id);
+    final EventModel? event = _box.get(id);
+    await _notificationService.cancelEventReminders(
+      id,
+      knownReminderDays: event?.reminderDays ?? const <int>[0, 1, 2, 3, 7, 14, 30],
+    );
+    await _notificationService.cancelLiveProgressNotification(id);
     await _syncService.deleteEvent(id);
   }
 

@@ -117,8 +117,12 @@ class AccountScreen extends ConsumerWidget {
             OutlinedButton(
               onPressed: () async {
                 await auth.signOut();
+                // Don't use Navigator.pop() after async auth state change
+                // The auth state change will automatically trigger navigation via GoRouter
+                // Just ensure we're not navigating during a locked state
                 if (context.mounted) {
-                  Navigator.of(context).pop();
+                  // Let the auth state listener handle navigation
+                  // The router will redirect from /settings to /login automatically
                 }
               },
               child: const Text('Sign Out'),
@@ -453,9 +457,16 @@ class AccountScreen extends ConsumerWidget {
       return;
     }
 
-    await auth.deleteAccount();
-    if (context.mounted) {
-      Navigator.of(context).pop();
+    try {
+      await auth.deleteAccount();
+      // Account deletion also signs out, let GoRouter handle navigation
+      // Don't use Navigator.pop() after async state change
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to delete account: $e')),
+        );
+      }
     }
   }
 

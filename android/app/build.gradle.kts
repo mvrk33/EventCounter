@@ -12,6 +12,10 @@ plugins {
 val keystoreProperties = Properties()
 val keystorePropertiesFile = rootProject.file("key.properties")
 val hasReleaseSigning = keystorePropertiesFile.exists()
+val enableCodeShrinking =
+    (project.findProperty("daymark.release.enableCodeShrinking") as String?)
+        ?.toBooleanStrictOrNull()
+        ?: false
 
 if (hasReleaseSigning) {
     FileInputStream(keystorePropertiesFile).use { keystoreProperties.load(it) }
@@ -56,6 +60,12 @@ android {
 
     buildTypes {
         release {
+            isMinifyEnabled = enableCodeShrinking
+            isShrinkResources = enableCodeShrinking
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
             signingConfig =
                 if (hasReleaseSigning) signingConfigs.getByName("release")
                 else signingConfigs.getByName("debug")

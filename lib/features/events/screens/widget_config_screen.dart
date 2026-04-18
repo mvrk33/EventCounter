@@ -8,8 +8,33 @@ import 'package:home_widget/home_widget.dart';
 import '../services/home_widget_service.dart';
 import '../providers/events_provider.dart';
 
+abstract class WidgetConfigStore {
+  Future<T?> getData<T>(String key);
+  Future<void> saveData<T>(String key, T value);
+}
+
+class HomeWidgetConfigStore implements WidgetConfigStore {
+  const HomeWidgetConfigStore();
+
+  @override
+  Future<T?> getData<T>(String key) => HomeWidget.getWidgetData<T>(key);
+
+  @override
+  Future<void> saveData<T>(String key, T value) =>
+      HomeWidget.saveWidgetData<T>(key, value);
+}
+
 class WidgetConfigScreen extends ConsumerStatefulWidget {
-  const WidgetConfigScreen({super.key});
+  const WidgetConfigScreen({
+    this.store,
+    this.homeWidgetService,
+    this.pinWidget,
+    super.key,
+  });
+
+  final WidgetConfigStore? store;
+  final EventHomeWidgetService? homeWidgetService;
+  final Future<bool> Function()? pinWidget;
 
   @override
   ConsumerState<WidgetConfigScreen> createState() => _WidgetConfigScreenState();
@@ -18,6 +43,14 @@ class WidgetConfigScreen extends ConsumerStatefulWidget {
 class _WidgetConfigScreenState extends ConsumerState<WidgetConfigScreen> {
   static const MethodChannel _widgetChannel =
       MethodChannel('event_counter/widget_actions');
+  static const List<String> _countUnitOptions = <String>[
+    'days',
+    'months',
+    'years',
+  ];
+
+  late final WidgetConfigStore _store;
+  late final EventHomeWidgetService _homeWidgetService;
 
   // Config state
   String _eventMode = 'nearest';
@@ -32,30 +65,31 @@ class _WidgetConfigScreenState extends ConsumerState<WidgetConfigScreen> {
   @override
   void initState() {
     super.initState();
+    _store = widget.store ?? const HomeWidgetConfigStore();
+    _homeWidgetService = widget.homeWidgetService ?? EventHomeWidgetService();
     _loadConfig();
   }
 
   Future<void> _loadConfig() async {
     try {
-      _eventMode =
-          await HomeWidget.getWidgetData<String>(WidgetKeys.cfgEventMode) ??
-              'nearest';
-      _transparent =
-          await HomeWidget.getWidgetData<bool>(WidgetKeys.cfgTransparent) ??
-              false;
-      _showEmoji =
-          await HomeWidget.getWidgetData<bool>(WidgetKeys.cfgShowEmoji) ?? true;
-      _showTitle =
-          await HomeWidget.getWidgetData<bool>(WidgetKeys.cfgShowTitle) ?? true;
-      _countUnit =
-          await HomeWidget.getWidgetData<String>(WidgetKeys.cfgCountUnit) ??
-              'days';
-      final String bgHex =
-          await HomeWidget.getWidgetData<String>(WidgetKeys.cfgBgColor) ??
-              '#CC5E6AD2';
-      final String txtHex =
-          await HomeWidget.getWidgetData<String>(WidgetKeys.cfgTextColor) ??
-              '#FFFFFFFF';
+      final List<dynamic> values = await Future.wait<dynamic>(
+        <Future<dynamic>>[
+          _store.getData<String>(WidgetKeys.cfgEventMode),
+          _store.getData<bool>(WidgetKeys.cfgTransparent),
+          _store.getData<bool>(WidgetKeys.cfgShowEmoji),
+          _store.getData<bool>(WidgetKeys.cfgShowTitle),
+          _store.getData<String>(WidgetKeys.cfgCountUnit),
+          _store.getData<String>(WidgetKeys.cfgBgColor),
+          _store.getData<String>(WidgetKeys.cfgTextColor),
+        ],
+      );
+      _eventMode = values[0] as String? ?? 'nearest';
+      _transparent = values[1] as bool? ?? false;
+      _showEmoji = values[2] as bool? ?? true;
+      _showTitle = values[3] as bool? ?? true;
+      _countUnit = values[4] as String? ?? 'days';
+      final String bgHex = values[5] as String? ?? '#CC5E6AD2';
+      final String txtHex = values[6] as String? ?? '#FFFFFFFF';
       _bgColor = _hexToColor(bgHex);
       _textColor = _hexToColor(txtHex);
     } catch (_) {/**/}
@@ -77,22 +111,17 @@ class _WidgetConfigScreenState extends ConsumerState<WidgetConfigScreen> {
   }
 
   Future<void> _applyAndUpdate() async {
-    await HomeWidget.saveWidgetData<String>(
-        WidgetKeys.cfgEventMode, _eventMode);
-    await HomeWidget.saveWidgetData<bool>(
-        WidgetKeys.cfgTransparent, _transparent);
-    await HomeWidget.saveWidgetData<String>(
-        WidgetKeys.cfgBgColor, _colorToHex(_bgColor));
-    await HomeWidget.saveWidgetData<String>(
-        WidgetKeys.cfgTextColor, _colorToHex(_textColor));
-    await HomeWidget.saveWidgetData<bool>(WidgetKeys.cfgShowEmoji, _showEmoji);
-    await HomeWidget.saveWidgetData<bool>(WidgetKeys.cfgShowTitle, _showTitle);
-    await HomeWidget.saveWidgetData<String>(
-        WidgetKeys.cfgCountUnit, _countUnit);
+    await _store.saveData<String>(WidgetKeys.cfgEventMode, _eventMode);
+    await _store.saveData<bool>(WidgetKeys.cfgTransparent, _transparent);
+    await _store.saveData<String>(WidgetKeys.cfgBgColor, _colorToHex(_bgColor));
+    await _store.saveData<String>(WidgetKeys.cfgTextColor, _colorToHex(_textColor));
+    await _store.saveData<bool>(WidgetKeys.cfgShowEmoji, _showEmoji);
+    await _store.saveData<bool>(WidgetKeys.cfgShowTitle, _showTitle);
+    await _store.saveData<String>(WidgetKeys.cfgCountUnit, _countUnit);
 
     // Re-push widget data with new config
     final events = ref.read(eventsProvider);
-    await const EventHomeWidgetService().pushEvents(events);
+    await _homeWidgetService.pushEvents(events);
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -104,8 +133,9 @@ class _WidgetConfigScreenState extends ConsumerState<WidgetConfigScreen> {
 
   Future<void> _pinWidget() async {
     try {
-      final bool result =
-          (await _widgetChannel.invokeMethod<bool>('pinWidget')) ?? false;
+      final bool result = widget.pinWidget != null
+          ? await widget.pinWidget!()
+          : (await _widgetChannel.invokeMethod<bool>('pinWidget')) ?? false;
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -154,7 +184,7 @@ class _WidgetConfigScreenState extends ConsumerState<WidgetConfigScreen> {
           const SizedBox(height: 24),
 
           // ── Event source ─────────────────────────────────────────────
-          _GroupLabel(label: 'EVENT SOURCE'),
+          const _GroupLabel(label: 'EVENT SOURCE'),
           const SizedBox(height: 8),
           _Card(
             child: Column(
@@ -182,11 +212,11 @@ class _WidgetConfigScreenState extends ConsumerState<WidgetConfigScreen> {
           const SizedBox(height: 20),
 
           // ── Count unit ───────────────────────────────────────────────
-          _GroupLabel(label: 'COUNT IN'),
+          const _GroupLabel(label: 'COUNT IN'),
           const SizedBox(height: 8),
           _Card(
             child: Row(
-              children: <String>['days', 'months', 'years'].map((String u) {
+              children: _countUnitOptions.map((String u) {
                 final bool sel = _countUnit == u;
                 return Expanded(
                   child: Padding(
@@ -227,7 +257,7 @@ class _WidgetConfigScreenState extends ConsumerState<WidgetConfigScreen> {
           const SizedBox(height: 20),
 
           // ── Display options ──────────────────────────────────────────
-          _GroupLabel(label: 'DISPLAY'),
+          const _GroupLabel(label: 'DISPLAY'),
           const SizedBox(height: 8),
           _Card(
             child: Column(
@@ -253,7 +283,7 @@ class _WidgetConfigScreenState extends ConsumerState<WidgetConfigScreen> {
           const SizedBox(height: 20),
 
           // ── Background ───────────────────────────────────────────────
-          _GroupLabel(label: 'BACKGROUND'),
+          const _GroupLabel(label: 'BACKGROUND'),
           const SizedBox(height: 8),
           _Card(
             child: Column(
@@ -306,7 +336,7 @@ class _WidgetConfigScreenState extends ConsumerState<WidgetConfigScreen> {
           const SizedBox(height: 20),
 
           // ── Text colour ──────────────────────────────────────────────
-          _GroupLabel(label: 'TEXT COLOUR'),
+          const _GroupLabel(label: 'TEXT COLOUR'),
           const SizedBox(height: 8),
           _Card(
             child: Padding(

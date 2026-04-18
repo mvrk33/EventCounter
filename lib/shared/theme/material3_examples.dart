@@ -5,22 +5,8 @@ import 'package:flutter/material.dart';
 import 'material3_constants.dart';
 
 /// Example 1: Using Material 3 Colors
-void exampleColors(BuildContext context) {
-  final colorScheme = Theme.of(context).colorScheme;
-
-  // Primary color - main brand color
-  final primaryColor = colorScheme.primary;
-
-  // Secondary color - supporting accent
-  final secondaryColor = colorScheme.secondary;
-
-  // Surface colors - for backgrounds
-  final surface = colorScheme.surface;
-  final surfaceContainer = colorScheme.surfaceContainer;
-
-  // Text colors
-  final onSurface = colorScheme.onSurface;
-  final onPrimary = colorScheme.onPrimary;
+ColorScheme exampleColors(BuildContext context) {
+  return Theme.of(context).colorScheme;
 }
 
 /// Example 2: Using Material 3 Typography
@@ -45,7 +31,7 @@ void exampleTypography(BuildContext context) {
 
 /// Example 3: Material 3 Button Styles
 class Material3ButtonExamples extends StatelessWidget {
-  const Material3ButtonExamples({Key? key}) : super(key: key);
+  const Material3ButtonExamples({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -87,12 +73,10 @@ class Material3ButtonExamples extends StatelessWidget {
 
 /// Example 4: Material 3 Card
 class Material3CardExample extends StatelessWidget {
-  const Material3CardExample({Key? key}) : super(key: key);
+  const Material3CardExample({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
     return Card(
       shape: RoundedRectangleBorder(
         borderRadius: Material3BorderRadius.normal(),
@@ -105,7 +89,7 @@ class Material3CardExample extends StatelessWidget {
               'Card Title',
               style: Theme.of(context).textTheme.titleLarge,
             ),
-            SizedBox(height: Material3Constants.spacing12),
+            const SizedBox(height: Material3Constants.spacing12),
             Text(
               'Card content goes here',
               style: Theme.of(context).textTheme.bodyMedium,
@@ -119,7 +103,7 @@ class Material3CardExample extends StatelessWidget {
 
 /// Example 5: Material 3 Input Field
 class Material3InputExample extends StatelessWidget {
-  const Material3InputExample({Key? key}) : super(key: key);
+  const Material3InputExample({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -197,7 +181,7 @@ void showMaterial3BottomSheet(BuildContext context) {
             'Bottom Sheet Title',
             style: Theme.of(context).textTheme.headlineSmall,
           ),
-          SizedBox(height: Material3Constants.spacing16),
+          const SizedBox(height: Material3Constants.spacing16),
           FilledButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('Action'),
@@ -210,7 +194,7 @@ void showMaterial3BottomSheet(BuildContext context) {
 
 /// Example 8: Material 3 Chip
 class Material3ChipExample extends StatefulWidget {
-  const Material3ChipExample({Key? key}) : super(key: key);
+  const Material3ChipExample({super.key});
 
   @override
   State<Material3ChipExample> createState() => _Material3ChipExampleState();
@@ -238,7 +222,7 @@ class _Material3ChipExampleState extends State<Material3ChipExample> {
 
 /// Example 9: Material 3 FAB (Floating Action Button)
 class Material3FABExample extends StatelessWidget {
-  const Material3FABExample({Key? key}) : super(key: key);
+  const Material3FABExample({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -258,7 +242,7 @@ class Material3FABExample extends StatelessWidget {
 
 /// Example 10: Using Material 3 Extensions
 class Material3ExtensionExample extends StatelessWidget {
-  const Material3ExtensionExample({Key? key}) : super(key: key);
+  const Material3ExtensionExample({super.key});
 
   @override
   Widget build(BuildContext context) {
