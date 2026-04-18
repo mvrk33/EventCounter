@@ -39,6 +39,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   late final ShareFilesCallback _shareFiles;
   int _developerTapCount = 0;
   Timer? _developerTapReset;
+  String? _passphraseInput;
 
   static final Uri _githubUri = Uri.parse('https://github.com/mvrk33');
 
@@ -247,6 +248,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                     await _exportService.exportEventsJson(
                                   events,
                                   security: pinSecurity,
+                                  passphraseForBackup: pinSecurity
+                                          .isPassphraseBackupEncryptionEnabled
+                                      ? await _promptForExportPassphrase()
+                                      : null,
                                 );
                                 await _shareFiles(<XFile>[XFile(file.path)]);
                               },
@@ -334,6 +339,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         value: cloudEncryptionEnabled,
                         onChanged: (bool value) =>
                             _setCloudBackupEncryption(value),
+                      ),
+                    ),
+                    _SettingsDivider(),
+                    _SettingsRow(
+                      icon: Icons.vpn_key_rounded,
+                      iconColor: const Color(0xFFD32F2F),
+                      title: 'Passphrase-protected backups',
+                      subtitle:
+                          'Portable cross-device restore with a passphrase',
+                      trailing: Switch(
+                        value: pinSecurity.isPassphraseBackupEncryptionEnabled,
+                        onChanged: (bool value) =>
+                            _setPassphraseBackupEncryption(value),
                       ),
                     ),
                   ],
@@ -470,6 +488,70 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 : 'Cloud backup encryption disabled.')),
       );
     }
+  }
+
+  Future<void> _setPassphraseBackupEncryption(bool enabled) async {
+    final PinSecurityService pinSecurity = ref.read(pinSecurityServiceProvider);
+
+    if (enabled) {
+      if (!mounted) return;
+      final String? passphrase = await showDialog<String>(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext ctx) => _PassphraseSetupDialog(),
+      );
+
+      if (passphrase != null && passphrase.isNotEmpty) {
+        await pinSecurity.setPassphraseBackupEncryptionEnabled(
+          true,
+          passphrase: passphrase,
+        );
+        if (mounted) {
+          setState(() {});
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+                content: Text('Passphrase-protected backups enabled.')),
+          );
+        }
+      }
+    } else {
+      await pinSecurity.setPassphraseBackupEncryptionEnabled(false);
+      if (mounted) {
+        setState(() {});
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Passphrase-protected backups disabled.')),
+        );
+      }
+    }
+  }
+
+  Future<String?> _promptForExportPassphrase() async {
+    if (!mounted) return null;
+    return showDialog<String>(
+      context: context,
+      builder: (BuildContext ctx) => AlertDialog(
+        title: const Text('Enter passphrase'),
+        content: TextField(
+          obscureText: true,
+          onChanged: (String val) => _passphraseInput = val,
+          decoration: const InputDecoration(
+            labelText: 'Backup passphrase',
+            hintText: 'Your passphrase to protect this export',
+          ),
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(_passphraseInput),
+            child: const Text('Export'),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -621,6 +703,109 @@ class _IconBox extends StatelessWidget {
         borderRadius: BorderRadius.circular(10),
       ),
       child: Icon(icon, color: color, size: 18),
+    );
+  }
+}
+
+class _PassphraseSetupDialog extends StatefulWidget {
+  @override
+  State<_PassphraseSetupDialog> createState() => _PassphraseSetupDialogState();
+}
+
+class _PassphraseSetupDialogState extends State<_PassphraseSetupDialog> {
+  late TextEditingController _controller;
+  late TextEditingController _confirmController;
+  bool _obscureText = true;
+  String _errorText = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController();
+    _confirmController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _confirmController.dispose();
+    super.dispose();
+  }
+
+  void _onConfirm() {
+    final String pass = _controller.text;
+    final String confirm = _confirmController.text;
+
+    if (pass.isEmpty) {
+      setState(() => _errorText = 'Passphrase cannot be empty.');
+      return;
+    }
+
+    if (pass.length < 4) {
+      setState(() => _errorText = 'Passphrase must be at least 4 characters.');
+      return;
+    }
+
+    if (pass != confirm) {
+      setState(() => _errorText = 'Passphrases do not match.');
+      return;
+    }
+
+    Navigator.of(context).pop(pass);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return AlertDialog(
+      title: const Text('Set backup passphrase'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            'Create a memorable passphrase to encrypt backups portably across devices.',
+            style: Theme.of(context)
+                .textTheme
+                .bodySmall
+                ?.copyWith(color: scheme.onSurface.withValues(alpha: 0.7)),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _controller,
+            obscureText: _obscureText,
+            decoration: InputDecoration(
+              labelText: 'Passphrase',
+              hintText: 'At least 4 characters',
+              suffixIcon: IconButton(
+                icon: Icon(
+                    _obscureText ? Icons.visibility_off : Icons.visibility),
+                onPressed: () => setState(() => _obscureText = !_obscureText),
+              ),
+              errorText: _errorText.isNotEmpty ? _errorText : null,
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _confirmController,
+            obscureText: _obscureText,
+            decoration: const InputDecoration(
+              labelText: 'Confirm passphrase',
+            ),
+            onSubmitted: (_) => _onConfirm(),
+          ),
+        ],
+      ),
+      actions: <Widget>[
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: _onConfirm,
+          child: const Text('Create'),
+        ),
+      ],
     );
   }
 }

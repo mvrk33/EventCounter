@@ -137,6 +137,7 @@ class ExportService {
 
   Future<List<EventModel>> importEventsJsonFromPicker({
     PinSecurityService? security,
+    String? passphraseForRestore,
   }) async {
     final FilePickerResult? result = await FilePicker.platform.pickFiles(
       type: FileType.any,
@@ -157,19 +158,24 @@ class ExportService {
       return <EventModel>[];
     }
 
-    return parseEventsFromBackupRaw(raw, security: security);
+    return parseEventsFromBackupRaw(
+      raw,
+      security: security,
+      passphraseForRestore: passphraseForRestore,
+    );
   }
 
   Future<List<EventModel>> parseEventsFromBackupRaw(
     String raw, {
     PinSecurityService? security,
+    String? passphraseForRestore,
   }) async {
     if (raw.trim().isEmpty) {
       return <EventModel>[];
     }
 
-    final List<EventModel> parsedFromJson =
-        await _tryParseFromJson(raw, security: security);
+    final List<EventModel> parsedFromJson = await _tryParseFromJson(raw,
+        security: security, passphraseForRestore: passphraseForRestore);
     if (parsedFromJson.isNotEmpty) {
       return parsedFromJson;
     }

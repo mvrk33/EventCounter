@@ -23,12 +23,12 @@ Future<String> deriveKeyFromPassphrase(
     bits: 256,
   );
 
-  final List<int> derivedKey = await pbkdf2.derive(
-    passphraseBytes,
+  final SecretKey derivedKey = await pbkdf2.deriveKey(
+    secretKey: SecretKey(passphraseBytes),
     nonce: saltBytes,
   );
 
-  return base64Encode(derivedKey);
+  return base64Encode(await derivedKey.extractBytes());
 }
 
 enum SecureStorageMode {
@@ -90,7 +90,8 @@ class PinSecurityService {
   }
 
   bool get isPassphraseBackupEncryptionEnabled {
-    return (_settingsBox?.get(_passphraseBackupEncryptionKey) as bool?) ?? false;
+    return (_settingsBox?.get(_passphraseBackupEncryptionKey) as bool?) ??
+        false;
   }
 
   String? get passphraseBackupSalt {
