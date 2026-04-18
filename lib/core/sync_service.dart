@@ -390,20 +390,12 @@ class SyncService {
     }
   }
 
-  bool get _shouldEncryptCloud =>
-      _pinSecurityService.isCloudBackupEncryptionEnabled;
-
+  // Encryption is always on for cloud sync.
   Future<Map<String, dynamic>?> _eventCloudPayload(EventModel event) async {
-    if (!_shouldEncryptCloud) {
-      return event.toFirestore();
-    }
     await _pinSecurityService.ensureEncryptionKey();
-
     final Map<String, String>? encrypted =
         await _pinSecurityService.encryptJson(event.toJson());
-    if (encrypted == null) {
-      return null;
-    }
+    if (encrypted == null) return null;
     return <String, dynamic>{
       'id': event.id,
       'updatedAt': Timestamp.fromDate(event.updatedAt),
@@ -413,16 +405,10 @@ class SyncService {
   }
 
   Future<Map<String, dynamic>?> _habitCloudPayload(HabitModel habit) async {
-    if (!_shouldEncryptCloud) {
-      return habit.toFirestore();
-    }
     await _pinSecurityService.ensureEncryptionKey();
-
     final Map<String, String>? encrypted =
         await _pinSecurityService.encryptJson(habit.toJson());
-    if (encrypted == null) {
-      return null;
-    }
+    if (encrypted == null) return null;
     return <String, dynamic>{
       'id': habit.id,
       'updatedAt': Timestamp.fromDate(habit.updatedAt),

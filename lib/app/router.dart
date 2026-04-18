@@ -8,6 +8,9 @@ import '../core/auth_service.dart';
 import '../features/auth/screens/login_screen.dart';
 import '../features/events/screens/home_screen.dart';
 
+// Provider to track guest mode
+final StateProvider<bool> guestModeProvider = StateProvider<bool>((Ref ref) => false);
+
 final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
   final AuthService auth = ref.read(authServiceProvider);
   final _GoRouterRefreshStream refresh = _GoRouterRefreshStream(auth.authStateChanges);
@@ -18,11 +21,12 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
     refreshListenable: refresh,
     redirect: (context, state) {
       final bool isSignedIn = ref.read(authServiceProvider).isSignedIn;
+      final bool isGuestMode = ref.read(guestModeProvider);
       final bool isOnLogin = state.matchedLocation == '/login';
-      if (isSignedIn && isOnLogin) {
+      if ((isSignedIn || isGuestMode) && isOnLogin) {
         return '/home';
       }
-      if (!isSignedIn && !isOnLogin) {
+      if (!isSignedIn && !isGuestMode && !isOnLogin) {
         return '/login';
       }
       return null;

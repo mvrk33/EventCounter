@@ -117,29 +117,30 @@ class _NavItem extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
             AnimatedContainer(
-              duration: const Duration(milliseconds: 220),
+              duration: const Duration(milliseconds: 240),
               curve: Curves.easeOutCubic,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
               decoration: BoxDecoration(
                 color: selected ? scheme.primaryContainer : Colors.transparent,
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(16),
               ),
               child: Icon(
                 selected ? selectedIcon : icon,
                 color: selected
                     ? scheme.onPrimaryContainer
-                    : scheme.onSurface.withValues(alpha: 0.45),
+                    : scheme.onSurface.withValues(alpha: 0.40),
                 size: 22,
               ),
             ),
             const SizedBox(height: 2),
             AnimatedDefaultTextStyle(
-              duration: const Duration(milliseconds: 220),
+              duration: const Duration(milliseconds: 240),
               style: Theme.of(context).textTheme.labelSmall!.copyWith(
-                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                    fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
                     color: selected
                         ? scheme.primary
-                        : scheme.onSurface.withValues(alpha: 0.45),
+                        : scheme.onSurface.withValues(alpha: 0.40),
+                    fontSize: selected ? 11 : 10,
                   ),
               child: Text(label),
             ),
@@ -162,8 +163,8 @@ class _CenterButton extends StatelessWidget {
         child: GestureDetector(
           onTap: onTap,
           child: Container(
-            width: 52,
-            height: 52,
+            width: 56,
+            height: 56,
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: <Color>[
@@ -173,16 +174,22 @@ class _CenterButton extends StatelessWidget {
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
-              borderRadius: BorderRadius.circular(18),
+              borderRadius: BorderRadius.circular(20),
               boxShadow: <BoxShadow>[
                 BoxShadow(
-                  color: scheme.primary.withValues(alpha: 0.38),
-                  blurRadius: 16,
-                  offset: const Offset(0, 5),
+                  color: scheme.primary.withValues(alpha: 0.50),
+                  blurRadius: 22,
+                  spreadRadius: -2,
+                  offset: const Offset(0, 6),
+                ),
+                BoxShadow(
+                  color: scheme.primary.withValues(alpha: 0.15),
+                  blurRadius: 40,
+                  offset: const Offset(0, 12),
                 ),
               ],
             ),
-            child: Icon(Icons.add_rounded, color: scheme.onPrimary, size: 28),
+            child: Icon(Icons.add_rounded, color: scheme.onPrimary, size: 30),
           ),
         ),
       ),

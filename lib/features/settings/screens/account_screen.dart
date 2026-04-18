@@ -7,6 +7,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import '../../../core/auth_service.dart';
 import '../../../core/hive_boxes.dart';
 import '../../../core/sync_service.dart';
+import '../../../app/router.dart';
 
 class AccountScreen extends ConsumerWidget {
   const AccountScreen({super.key});
@@ -113,20 +114,21 @@ class AccountScreen extends ConsumerWidget {
             ),
           ],
           const SizedBox(height: 8),
-          if (user != null)
-            OutlinedButton(
-              onPressed: () async {
-                await auth.signOut();
-                // Don't use Navigator.pop() after async auth state change
-                // The auth state change will automatically trigger navigation via GoRouter
-                // Just ensure we're not navigating during a locked state
-                if (context.mounted) {
-                  // Let the auth state listener handle navigation
-                  // The router will redirect from /settings to /login automatically
-                }
-              },
-              child: const Text('Sign Out'),
-            ),
+           if (user != null)
+             OutlinedButton(
+               onPressed: () async {
+                 await auth.signOut();
+                 ref.read(guestModeProvider.notifier).state = false;
+                 // Don't use Navigator.pop() after async auth state change
+                 // The auth state change will automatically trigger navigation via GoRouter
+                 // Just ensure we're not navigating during a locked state
+                 if (context.mounted) {
+                   // Let the auth state listener handle navigation
+                   // The router will redirect from /settings to /login automatically
+                 }
+               },
+               child: const Text('Sign Out'),
+             ),
           if (user == null) ...<Widget>[
             FilledButton.icon(
               onPressed: () => _showEmailAuthDialog(

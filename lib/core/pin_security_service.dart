@@ -31,20 +31,6 @@ Future<String> deriveKeyFromPassphrase(
   return base64Encode(await derivedKey.extractBytes());
 }
 
-enum SecureStorageMode {
-  localOnly,
-  cloudEncrypted;
-
-  String get label {
-    switch (this) {
-      case SecureStorageMode.localOnly:
-        return 'Local only';
-      case SecureStorageMode.cloudEncrypted:
-        return 'Cloud encrypted';
-    }
-  }
-}
-
 final Provider<PinSecurityService> pinSecurityServiceProvider =
     Provider<PinSecurityService>((Ref ref) {
   return PinSecurityService(
@@ -62,117 +48,33 @@ class PinSecurityService {
   final Cipher _cipher = AesGcm.with256bits();
 
   static const String _keyKey = 'security_key_b64_v1';
-  static const String _localBackupEncryptionKey =
-      'security_local_backup_encryption_v1';
-  static const String _cloudBackupEncryptionKey =
-      'security_cloud_backup_encryption_v1';
-  static const String _passphraseBackupEncryptionKey =
-      'security_passphrase_backup_encryption_v1';
-  static const String _passphraseBackupSaltKey =
-      'security_passphrase_backup_salt_v1';
+  static const String _appLockKey = 'security_app_lock_enabled_v1';
 
-  // Backward-compatible alias used by older call sites.
-  bool get hasPin => false;
+  // Encryption is always on — these getters kept for backward compat with
+  // export_service.dart and sync_service.dart which check them.
+  bool get isLocalBackupEncryptionEnabled => true;
+  bool get isCloudBackupEncryptionEnabled => true;
 
-  // Backward-compatible alias used by older call sites.
-  SecureStorageMode get storageMode {
-    return isCloudBackupEncryptionEnabled
-        ? SecureStorageMode.cloudEncrypted
-        : SecureStorageMode.localOnly;
+  // App lock via system biometrics / device credential.
+  bool get isAppLockEnabled {
+    return (_settingsBox?.get(_appLockKey) as bool?) ?? false;
   }
 
-  bool get isLocalBackupEncryptionEnabled {
-    return (_settingsBox?.get(_localBackupEncryptionKey) as bool?) ?? true;
-  }
-
-  bool get isCloudBackupEncryptionEnabled {
-    return (_settingsBox?.get(_cloudBackupEncryptionKey) as bool?) ?? false;
-  }
-
-  bool get isPassphraseBackupEncryptionEnabled {
-    return (_settingsBox?.get(_passphraseBackupEncryptionKey) as bool?) ??
-        false;
-  }
-
-  String? get passphraseBackupSalt {
-    return (_settingsBox?.get(_passphraseBackupSaltKey) as String?);
-  }
-
-  Future<void> setLocalBackupEncryptionEnabled(bool enabled) async {
-    if (_settingsBox == null) {
-      return;
-    }
-    if (enabled) {
-      await ensureEncryptionKey();
-    }
-    await _settingsBox.put(_localBackupEncryptionKey, enabled);
-  }
-
-  Future<void> setCloudBackupEncryptionEnabled(bool enabled) async {
-    if (_settingsBox == null) {
-      return;
-    }
-    if (enabled) {
-      await ensureEncryptionKey();
-    }
-    await _settingsBox.put(_cloudBackupEncryptionKey, enabled);
-  }
-
-  Future<void> setPassphraseBackupEncryptionEnabled(
-    bool enabled, {
-    String? passphrase,
-  }) async {
-    if (_settingsBox == null) {
-      return;
-    }
-    if (enabled && passphrase != null && passphrase.isNotEmpty) {
-      await ensureEncryptionKey();
-      final String salt = base64Encode(_randomBytes(16));
-      await _settingsBox.put(_passphraseBackupSaltKey, salt);
-      await _settingsBox.put(_passphraseBackupEncryptionKey, true);
-    } else if (!enabled) {
-      await _settingsBox.put(_passphraseBackupEncryptionKey, false);
-      await _settingsBox.put(_passphraseBackupSaltKey, null);
-    }
+  Future<void> setAppLockEnabled(bool enabled) async {
+    if (_settingsBox == null) return;
+    await _settingsBox.put(_appLockKey, enabled);
   }
 
   Future<void> ensureEncryptionKey() async {
-    if (_settingsBox == null) {
-      return;
-    }
-    if (_currentKeyBytes() != null) {
-      return;
-    }
+    if (_settingsBox == null) return;
+    if (_currentKeyBytes() != null) return;
     await _settingsBox.put(_keyKey, base64Encode(_randomBytes(32)));
-  }
-
-  // Backward-compatible alias used by older call sites.
-  Future<void> setStorageMode(SecureStorageMode mode) async {
-    await setCloudBackupEncryptionEnabled(
-        mode == SecureStorageMode.cloudEncrypted);
-  }
-
-  // Backward-compatible no-op for replaced PIN UX.
-  Future<void> setPin(String pin) async {
-    await ensureEncryptionKey();
-  }
-
-  // Backward-compatible no-op for replaced PIN UX.
-  Future<bool> verifyPin(String pin) async {
-    return true;
-  }
-
-  // Backward-compatible no-op for replaced PIN UX.
-  Future<void> clearPin() async {
-    return;
   }
 
   Future<Map<String, String>?> encryptJson(Map<String, dynamic> json) async {
     await ensureEncryptionKey();
     final List<int>? key = _currentKeyBytes();
-    if (key == null) {
-      return null;
-    }
+    if (key == null) return null;
 
     final List<int> nonce = _randomBytes(12);
     final SecretBox box = await _cipher.encrypt(
@@ -191,17 +93,13 @@ class PinSecurityService {
   Future<Map<String, dynamic>?> decryptJson(
       Map<String, dynamic> payload) async {
     final List<int>? key = _currentKeyBytes();
-    if (key == null) {
-      return null;
-    }
+    if (key == null) return null;
 
     try {
       final String nonceRaw = (payload['nonce'] ?? '').toString();
       final String cipherRaw = (payload['ciphertext'] ?? '').toString();
       final String macRaw = (payload['mac'] ?? '').toString();
-      if (nonceRaw.isEmpty || cipherRaw.isEmpty || macRaw.isEmpty) {
-        return null;
-      }
+      if (nonceRaw.isEmpty || cipherRaw.isEmpty || macRaw.isEmpty) return null;
 
       final SecretBox box = SecretBox(
         base64Decode(cipherRaw),
@@ -213,12 +111,8 @@ class PinSecurityService {
         secretKey: SecretKey(key),
       );
       final dynamic decoded = jsonDecode(utf8.decode(clear));
-      if (decoded is Map<String, dynamic>) {
-        return decoded;
-      }
-      if (decoded is Map) {
-        return decoded.cast<String, dynamic>();
-      }
+      if (decoded is Map<String, dynamic>) return decoded;
+      if (decoded is Map) return decoded.cast<String, dynamic>();
       return null;
     } catch (_) {
       return null;
@@ -228,9 +122,7 @@ class PinSecurityService {
   Future<Map<String, String>?> encryptString(String clearText) async {
     await ensureEncryptionKey();
     final List<int>? key = _currentKeyBytes();
-    if (key == null) {
-      return null;
-    }
+    if (key == null) return null;
 
     final List<int> nonce = _randomBytes(12);
     final SecretBox box = await _cipher.encrypt(
@@ -248,17 +140,13 @@ class PinSecurityService {
 
   Future<String?> decryptString(Map<String, dynamic> payload) async {
     final List<int>? key = _currentKeyBytes();
-    if (key == null) {
-      return null;
-    }
+    if (key == null) return null;
 
     try {
       final String nonceRaw = (payload['nonce'] ?? '').toString();
       final String cipherRaw = (payload['ciphertext'] ?? '').toString();
       final String macRaw = (payload['mac'] ?? '').toString();
-      if (nonceRaw.isEmpty || cipherRaw.isEmpty || macRaw.isEmpty) {
-        return null;
-      }
+      if (nonceRaw.isEmpty || cipherRaw.isEmpty || macRaw.isEmpty) return null;
       final SecretBox box = SecretBox(
         base64Decode(cipherRaw),
         nonce: base64Decode(nonceRaw),
@@ -274,8 +162,10 @@ class PinSecurityService {
     }
   }
 
-  /// Encrypts a string using a passphrase-derived key (portable backup).
-  /// Returns map with nonce, ciphertext, mac (same structure as device-key encryption).
+  // Kept for import backward-compat with old passphrase-encrypted backups.
+  bool get isPassphraseBackupEncryptionEnabled => false;
+  String? get passphraseBackupSalt => null;
+
   Future<Map<String, String>?> encryptStringWithPassphrase(
     String clearText,
     String passphrase, {
@@ -299,7 +189,6 @@ class PinSecurityService {
     };
   }
 
-  /// Decrypts a string encrypted with passphrase-derived key.
   Future<String?> decryptStringWithPassphrase(
     Map<String, dynamic> payload,
     String passphrase, {
@@ -313,9 +202,7 @@ class PinSecurityService {
       final String nonceRaw = (payload['nonce'] ?? '').toString();
       final String cipherRaw = (payload['ciphertext'] ?? '').toString();
       final String macRaw = (payload['mac'] ?? '').toString();
-      if (nonceRaw.isEmpty || cipherRaw.isEmpty || macRaw.isEmpty) {
-        return null;
-      }
+      if (nonceRaw.isEmpty || cipherRaw.isEmpty || macRaw.isEmpty) return null;
 
       final SecretBox box = SecretBox(
         base64Decode(cipherRaw),
@@ -334,9 +221,7 @@ class PinSecurityService {
 
   List<int>? _currentKeyBytes() {
     final String? raw = _settingsBox?.get(_keyKey) as String?;
-    if (raw == null || raw.isEmpty) {
-      return null;
-    }
+    if (raw == null || raw.isEmpty) return null;
     return base64Decode(raw);
   }
 

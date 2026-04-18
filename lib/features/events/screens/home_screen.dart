@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:intl/intl.dart';
 import 'package:screenshot/screenshot.dart';
+import '../../../core/auth_service.dart';
 import '../../../core/hive_boxes.dart';
 import '../../../core/constants.dart';
 import '../../../core/sync_service.dart';
@@ -52,11 +53,30 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   String _cachedSelectedCategory = 'All';
   _EventSort _cachedSort = _EventSort.nearest;
 
+  bool _isSyncing = false;
+
   @override
   void initState() {
     super.initState();
     _pageController = PageController(initialPage: _tabIndexFromNav(_navIndex));
     _cardView = _readPersistedCardView();
+    // Trigger a cloud restore after the home screen appears so events stored
+    // in Firestore are pulled down even if the user skipped RestoreDataScreen
+    // or auto-restore was previously disabled.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _initialCloudSync());
+  }
+
+  Future<void> _initialCloudSync() async {
+    final auth = ref.read(authServiceProvider);
+    if (!auth.isSignedIn || !mounted) return;
+    setState(() => _isSyncing = true);
+    try {
+      await ref.read(syncServiceProvider).restoreAll();
+    } catch (_) {
+      // Silently ignore — events already in local Hive remain visible.
+    } finally {
+      if (mounted) setState(() => _isSyncing = false);
+    }
   }
 
   @override
@@ -143,15 +163,29 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final DateTime now = DateTime.now();
     final DateTime today = DateTime(now.year, now.month, now.day);
     final int thisWeekCount = events.where((e) {
-      // Use nextOccurrenceDate for recurring events to get the actual upcoming date
       final d = DateTime(e.nextOccurrenceDate.year, e.nextOccurrenceDate.month, e.nextOccurrenceDate.day);
       return d.difference(today).inDays <= 7 && !d.isBefore(today);
     }).length;
 
+    // Find "next up" event — the nearest upcoming event
+    EventModel? nextUpEvent;
+    {
+      final upcoming = events.where((e) {
+        final d = DateTime(e.nextOccurrenceDate.year, e.nextOccurrenceDate.month, e.nextOccurrenceDate.day);
+        return !d.isBefore(today);
+      }).toList(growable: false);
+      if (upcoming.isNotEmpty) {
+        upcoming.sort((a, b) => a.nextOccurrenceDate.compareTo(b.nextOccurrenceDate));
+        nextUpEvent = upcoming.first;
+      }
+    }
+
     return RefreshIndicator(
       onRefresh: () async {
         final SyncService sync = ref.read(syncServiceProvider);
-        await sync.syncAll(messenger: ScaffoldMessenger.of(context));
+        final messenger = ScaffoldMessenger.of(context);
+        await sync.restoreAll(messenger: messenger);
+        await sync.syncAll(messenger: messenger);
       },
       child: CustomScrollView(
         slivers: <Widget>[
@@ -159,6 +193,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           SliverToBoxAdapter(
             child: _buildGreetingHeader(context, thisWeekCount, habits.length),
           ),
+          // ── "Next Up" spotlight ───────────────────────────────────────
+          if (nextUpEvent != null && _searchQuery.isEmpty && _selectedCategory == 'All')
+            SliverToBoxAdapter(
+              child: _buildNextUpCard(context, nextUpEvent),
+            ),
+          // ── Cloud sync banner (shows while initial restore runs) ──────
+          if (_isSyncing)
+            SliverToBoxAdapter(
+              child: _buildSyncBanner(context),
+            ),
           // ── Search & filter bar ───────────────────────────────────────
           SliverToBoxAdapter(
             child: _buildSearchBar(context),
@@ -196,59 +240,314 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  Widget _buildGreetingHeader(
-      BuildContext context, int thisWeekCount, int habitCount) {
+  Widget _buildNextUpCard(BuildContext context, EventModel event) {
     final scheme = Theme.of(context).colorScheme;
-    final hour = DateTime.now().hour;
-    final String greeting = hour < 12
-        ? 'Good morning'
-        : hour < 17
-            ? 'Good afternoon'
-            : 'Good evening';
-    final String dateStr = DateFormat('EEEE, MMMM d').format(DateTime.now());
+    final Color accent = Color(event.color);
+    final int daysUntil = DateHelpers.daysBetween(DateTime.now(), event.nextOccurrenceDate).abs();
+    final DateTime today = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
+    final DateTime nextDate = DateTime(
+        event.nextOccurrenceDate.year, event.nextOccurrenceDate.month, event.nextOccurrenceDate.day);
+    final bool isToday = DateHelpers.sameDay(nextDate, today);
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 24, 20, 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          // Greeting + date
-          Text(
-            '$greeting 👋',
-            style: Theme.of(context).textTheme.headlineMedium,
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+      child: GestureDetector(
+        onTap: () => _showEventDetail(context, event),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: <Color>[
+                accent.withValues(alpha: 0.18),
+                accent.withValues(alpha: 0.07),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(
+              color: accent.withValues(alpha: 0.22),
+              width: 1,
+            ),
           ),
-          const SizedBox(height: 3),
-          Text(
-            dateStr,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: scheme.onSurface.withValues(alpha: 0.50),
-                ),
-          ),
-          const SizedBox(height: 18),
-          // Dashboard stat cards (full-width pair)
-          Row(
+          child: Row(
             children: <Widget>[
+              // Left: label + event info
               Expanded(
-                child: _StatCard(
-                  icon: Icons.event_rounded,
-                  label: 'This week',
-                  value: '$thisWeekCount',
-                  color: scheme.primary,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Row(
+                      children: <Widget>[
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: accent.withValues(alpha: 0.20),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: <Widget>[
+                              Icon(Icons.bolt_rounded, size: 12, color: accent),
+                              const SizedBox(width: 3),
+                              Text(
+                                'NEXT UP',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                  color: accent,
+                                  letterSpacing: 0.8,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: <Widget>[
+                        Text(event.emoji, style: const TextStyle(fontSize: 22)),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            event.title,
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: -0.3,
+                                ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      isToday
+                          ? '🎉 Today!'
+                          : DateFormat('EEE, MMM d').format(event.nextOccurrenceDate),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: scheme.onSurface.withValues(alpha: 0.60),
+                          ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _StatCard(
-                  icon: Icons.local_fire_department_rounded,
-                  label: 'Active habits',
-                  value: '$habitCount',
-                  color: Colors.deepOrange,
+              // Right: large countdown
+              Container(
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: accent.withValues(alpha: isToday ? 0.25 : 0.12),
+                  border: Border.all(
+                    color: accent.withValues(alpha: isToday ? 0.55 : 0.30),
+                    width: 2,
+                  ),
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: <Widget>[
+                    Text(
+                      isToday ? '🎊' : '$daysUntil',
+                      style: TextStyle(
+                        fontSize: isToday ? 30 : 26,
+                        fontWeight: FontWeight.w900,
+                        color: accent,
+                        height: 1.0,
+                      ),
+                    ),
+                    if (!isToday)
+                      Text(
+                        'days',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: accent.withValues(alpha: 0.75),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                  ],
                 ),
               ),
             ],
           ),
-        ],
+        ),
       ),
+    );
+  }
+
+  Widget _buildGreetingHeader(
+      BuildContext context, int thisWeekCount, int habitCount) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final hour = DateTime.now().hour;
+
+    final String greeting;
+    final String greetingEmoji;
+    if (hour < 5) {
+      greeting = 'Late night';
+      greetingEmoji = '🌙';
+    } else if (hour < 12) {
+      greeting = 'Good morning';
+      greetingEmoji = '☀️';
+    } else if (hour < 17) {
+      greeting = 'Good afternoon';
+      greetingEmoji = '🌤️';
+    } else {
+      greeting = 'Good evening';
+      greetingEmoji = '🌆';
+    }
+
+    final String dayStr = DateFormat('EEEE').format(DateTime.now());
+    final String dateStr = DateFormat('MMMM d, y').format(DateTime.now());
+
+    // Pick gradient based on time of day
+    final List<Color> gradientColors;
+    if (isDark) {
+      gradientColors = [const Color(0xFF1A1D3A), const Color(0xFF2E2060)];
+    } else if (hour < 5) {
+      gradientColors = [const Color(0xFF1A1A3E), const Color(0xFF2D1B5E)];
+    } else if (hour < 12) {
+      gradientColors = [const Color(0xFF3B5BDB), const Color(0xFF845EF7)];
+    } else if (hour < 17) {
+      gradientColors = [const Color(0xFF1971C2), const Color(0xFF0CA678)];
+    } else {
+      gradientColors = [const Color(0xFF862E9C), const Color(0xFFE67700)];
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        // ── Hero banner ───────────────────────────────────────────────────
+        Container(
+          margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: gradientColors,
+            ),
+            borderRadius: BorderRadius.circular(28),
+            boxShadow: <BoxShadow>[
+              BoxShadow(
+                color: gradientColors.last.withValues(alpha: isDark ? 0.35 : 0.28),
+                blurRadius: 32,
+                offset: const Offset(0, 12),
+              ),
+            ],
+          ),
+          child: Stack(
+            children: <Widget>[
+              // Decorative blobs
+              Positioned(
+                right: -30,
+                top: -30,
+                child: Container(
+                  width: 140,
+                  height: 140,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withValues(alpha: 0.05),
+                  ),
+                ),
+              ),
+              Positioned(
+                left: -20,
+                bottom: -30,
+                child: Container(
+                  width: 100,
+                  height: 100,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withValues(alpha: 0.04),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(22, 20, 22, 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    // Date row
+                    Row(
+                      children: <Widget>[
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: <Widget>[
+                              const Icon(Icons.calendar_today_rounded,
+                                  size: 11, color: Colors.white),
+                              const SizedBox(width: 5),
+                              Text(
+                                dayStr.toUpperCase(),
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
+                                  letterSpacing: 1.1,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Spacer(),
+                        Text(
+                          dateStr,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.white.withValues(alpha: 0.60),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    // Greeting
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Expanded(
+                          child: Text(
+                            '$greeting $greetingEmoji',
+                            style: const TextStyle(
+                              fontSize: 28,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                              letterSpacing: -0.6,
+                              height: 1.1,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 18),
+                    // Stat pills row
+                    Row(
+                      children: <Widget>[
+                        _HeroPill(
+                          icon: Icons.event_rounded,
+                          label: '$thisWeekCount this week',
+                        ),
+                        const SizedBox(width: 10),
+                        _HeroPill(
+                          icon: Icons.local_fire_department_rounded,
+                          label: '$habitCount habits',
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+      ],
     );
   }
 
@@ -451,6 +750,44 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
+  Widget _buildSyncBanner(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: scheme.primaryContainer.withValues(alpha: 0.55),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: scheme.primary.withValues(alpha: 0.18),
+            width: 1,
+          ),
+        ),
+        child: Row(
+          children: <Widget>[
+            SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: scheme.primary,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              'Syncing your events from cloud…',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: scheme.onPrimaryContainer,
+                    fontWeight: FontWeight.w600,
+                  ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildEmptyState(BuildContext context, {required bool isEmpty}) {
     final scheme = Theme.of(context).colorScheme;
     return Center(
@@ -459,38 +796,48 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
+            // Illustration
             Container(
-              width: 96,
-              height: 96,
+              width: 110,
+              height: 110,
               decoration: BoxDecoration(
-                color: scheme.primaryContainer.withValues(alpha: 0.5),
                 shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: <Color>[
+                    scheme.primaryContainer.withValues(alpha: 0.55),
+                    scheme.primaryContainer.withValues(alpha: 0.15),
+                  ],
+                ),
               ),
               child: Center(
                 child: Text(
                   isEmpty ? '🗓️' : '🔍',
-                  style: const TextStyle(fontSize: 44),
+                  style: const TextStyle(fontSize: 48),
                 ),
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 28),
             Text(
               isEmpty ? 'No events yet' : 'No matching events',
-              style: Theme.of(context).textTheme.titleLarge,
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.5,
+                  ),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             Text(
               isEmpty
-                  ? 'Tap the + button below\nto create your first event.'
-                  : 'Try adjusting your search\nor clear the filters.',
+                  ? 'Tap the ＋ button below\nto create your first event.'
+                  : 'Try adjusting your search\nor clear the active filters.',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: scheme.onSurface.withValues(alpha: 0.55),
+                    color: scheme.onSurface.withValues(alpha: 0.50),
+                    height: 1.6,
                   ),
               textAlign: TextAlign.center,
             ),
             if (!isEmpty) ...<Widget>[
-              const SizedBox(height: 20),
+              const SizedBox(height: 28),
               FilledButton.tonal(
                 onPressed: _clearFilters,
                 child: const Text('Clear filters'),
@@ -592,25 +939,37 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final scheme = Theme.of(context).colorScheme;
     return SliverToBoxAdapter(
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 22, 20, 8),
+        padding: const EdgeInsets.fromLTRB(20, 28, 20, 10),
         child: Row(
           children: <Widget>[
             Container(
-              width: 3,
-              height: 14,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
               decoration: BoxDecoration(
-                color: scheme.primary.withValues(alpha: 0.45),
-                borderRadius: BorderRadius.circular(2),
+                color: scheme.secondaryContainer.withValues(alpha: 0.60),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                title,
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                      color: scheme.onSecondaryContainer,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.2,
+                    ),
               ),
             ),
-            const SizedBox(width: 8),
-            Text(
-              title,
-              style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: scheme.onSurface.withValues(alpha: 0.55),
-                    letterSpacing: 0.4,
-                    fontWeight: FontWeight.w700,
+            const SizedBox(width: 10),
+            Expanded(
+              child: Container(
+                height: 1,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: <Color>[
+                      scheme.outlineVariant.withValues(alpha: 0.35),
+                      Colors.transparent,
+                    ],
                   ),
+                ),
+              ),
             ),
           ],
         ),
@@ -744,59 +1103,36 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-class _StatCard extends StatelessWidget {
-  const _StatCard({
+/// Compact pill badge used inside the hero gradient banner.
+class _HeroPill extends StatelessWidget {
+  const _HeroPill({
     required this.icon,
     required this.label,
-    required this.value,
-    required this.color,
   });
 
   final IconData icon;
   final String label;
-  final String value;
-  final Color color;
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
       decoration: BoxDecoration(
-        color: scheme.surfaceContainerLow,
+        color: Colors.white.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: color.withValues(alpha: 0.15),
-          width: 1,
-        ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(icon, color: color, size: 18),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            value,
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w800,
-                  color: scheme.onSurface,
-                  letterSpacing: -0.5,
-                ),
-          ),
-          const SizedBox(height: 2),
+          Icon(icon, color: Colors.white, size: 14),
+          const SizedBox(width: 6),
           Text(
             label,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: scheme.onSurface.withValues(alpha: 0.50),
-                ),
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: Colors.white,
+            ),
           ),
         ],
       ),

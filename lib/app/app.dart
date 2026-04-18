@@ -36,7 +36,10 @@ class _EventCounterAppState extends ConsumerState<EventCounterApp> {
       final SyncService sync = ref.read(syncServiceProvider);
       await sync.replayPendingSync();
       final auth = ref.read(authServiceProvider);
-      if (auth.isSignedIn && await sync.shouldAutoRestoreOnLaunch()) {
+      // Always restore from cloud on launch when signed in so events are
+      // never missing after reinstall, device switch, or a "start fresh" choice.
+      // restoreAll uses updatedAt comparison so it never overwrites newer local data.
+      if (auth.isSignedIn) {
         await sync.restoreAll();
       }
       await ref.read(notificationServiceProvider).requestPermissionsOnFirstLaunch();

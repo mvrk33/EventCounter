@@ -167,16 +167,35 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     _SettingsRow(
                       icon: Icons.sync_rounded,
                       iconColor: const Color(0xFF43A047),
-                      title: 'Sync now',
+                      title: 'Sync to cloud',
                       subtitle: syncService.lastSyncedAt != null
                           ? 'Last: ${_formatDate(syncService.lastSyncedAt!)}'
                           : 'Never synced',
                       trailing: FilledButton.tonal(
-                        onPressed: () async {
-                          await syncService.syncAll(
-                              messenger: ScaffoldMessenger.of(context));
-                        },
-                        child: const Text('Sync'),
+                        onPressed: !isSignedIn
+                            ? null
+                            : () async {
+                                await syncService.syncAll(
+                                    messenger: ScaffoldMessenger.of(context));
+                              },
+                        child: const Text('Upload'),
+                      ),
+                    ),
+                    _SettingsDivider(),
+                    _SettingsRow(
+                      icon: Icons.cloud_download_outlined,
+                      iconColor: const Color(0xFF1E88E5),
+                      title: 'Restore from cloud',
+                      subtitle: 'Download your events & habits from backup',
+                      trailing: FilledButton.tonal(
+                        onPressed: !isSignedIn
+                            ? null
+                            : () async {
+                                final messenger = ScaffoldMessenger.of(context);
+                                await syncService.restoreAll(
+                                    messenger: messenger);
+                              },
+                        child: const Text('Restore'),
                       ),
                     ),
                   ],

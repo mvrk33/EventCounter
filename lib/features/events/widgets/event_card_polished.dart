@@ -38,22 +38,19 @@ class EventCardPolished extends StatelessWidget {
     final bool comfortable = density == EventCardDensity.comfortable;
 
     return Container(
-      margin: EdgeInsets.symmetric(horizontal: 16, vertical: comfortable ? 8 : 5),
+      margin: EdgeInsets.symmetric(horizontal: 16, vertical: comfortable ? 7 : 4),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: accent.withValues(alpha: 0.18),
-          width: 1,
-        ),
+        color: scheme.surface,
         boxShadow: <BoxShadow>[
           BoxShadow(
-            color: accent.withValues(alpha: 0.07),
-            blurRadius: 18,
-            offset: const Offset(0, 4),
+            color: accent.withValues(alpha: 0.08),
+            blurRadius: 20,
+            offset: const Offset(0, 6),
           ),
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 6,
+            blurRadius: 4,
             offset: const Offset(0, 2),
           ),
         ],
@@ -61,50 +58,35 @@ class EventCardPolished extends StatelessWidget {
       child: ClipRRect(
         borderRadius: BorderRadius.circular(20),
         child: Material(
-          color: scheme.surface,
+          color: Colors.transparent,
           child: InkWell(
             onTap: onTap,
-            splashColor: accent.withValues(alpha: 0.08),
-            highlightColor: accent.withValues(alpha: 0.04),
+            splashColor: accent.withValues(alpha: 0.07),
+            highlightColor: accent.withValues(alpha: 0.03),
             child: Stack(
               children: <Widget>[
-                // ── Subtle gradient tint (left-side colour hint) ──────────
+                // ── Left accent bar (full-height via Positioned) ──────────
                 Positioned(
                   left: 0,
                   top: 0,
                   bottom: 0,
-                  width: comfortable ? 120 : 90,
+                  width: 4,
                   child: DecoratedBox(
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
-                        colors: <Color>[
-                          accent.withValues(alpha: 0.07),
-                          Colors.transparent,
-                        ],
-                        begin: Alignment.centerLeft,
-                        end: Alignment.centerRight,
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: <Color>[accent, accent.withValues(alpha: 0.45)],
                       ),
                     ),
                   ),
                 ),
-                // ── Main content ──────────────────────────────────────────
+                // ── Main content (inset so it clears the accent bar) ──────
                 Padding(
-                  padding: EdgeInsets.fromLTRB(14, comfortable ? 16 : 14, 6, 14),
+                  padding: EdgeInsets.fromLTRB(18, comfortable ? 16 : 12, 6, comfortable ? 14 : 12),
                   child: comfortable
-                      ? _buildComfortableLayout(
-                          context,
-                          accent,
-                          value,
-                          compactDescription,
-                          fullDescription,
-                        )
-                      : _buildCompactLayout(
-                          context,
-                          accent,
-                          value,
-                          compactDescription,
-                          scheme,
-                        ),
+                      ? _buildComfortableLayout(context, accent, value, compactDescription, fullDescription)
+                      : _buildCompactLayout(context, accent, value, compactDescription, scheme),
                 ),
               ],
             ),
@@ -274,29 +256,29 @@ class EventCardPolished extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.end,
       children: <Widget>[
         Container(
-          padding: EdgeInsets.symmetric(horizontal: large ? 13 : 11, vertical: large ? 7 : 6),
+          padding: EdgeInsets.symmetric(horizontal: large ? 14 : 12, vertical: large ? 8 : 7),
           decoration: BoxDecoration(
-            color: accent.withValues(alpha: 0.11),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: accent.withValues(alpha: 0.20),
-              width: 1,
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [accent.withValues(alpha: 0.14), accent.withValues(alpha: 0.08)],
             ),
+            borderRadius: BorderRadius.circular(14),
           ),
           child: Text(
             '$value',
             style: (large ? textTheme.headlineSmall : textTheme.titleLarge)?.copyWith(
               color: accent,
               fontWeight: FontWeight.w800,
-              height: 1.1,
+              height: 1.0,
             ),
           ),
         ),
-        const SizedBox(height: 3),
+        const SizedBox(height: 4),
         Text(
           compactDescription,
           style: textTheme.labelSmall?.copyWith(
-            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.50),
+            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.45),
           ),
         ),
       ],
