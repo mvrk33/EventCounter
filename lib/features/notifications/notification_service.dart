@@ -10,6 +10,11 @@ import 'package:timezone/timezone.dart' as tz;
 import '../../core/hive_boxes.dart';
 import '../../features/events/models/event_model.dart';
 
+// Channel IDs
+const String _kEventChannel = 'event_counter_events';
+const String _kHabitChannel = 'event_counter_habits';
+const String _kLiveChannel = 'event_counter_live';
+
 final Provider<NotificationService> notificationServiceProvider = Provider<NotificationService>(
   (Ref ref) => NotificationService(),
 );
@@ -44,7 +49,11 @@ class NotificationService {
 
     const AndroidInitializationSettings androidSettings =
         AndroidInitializationSettings('@mipmap/ic_launcher');
-    const DarwinInitializationSettings iosSettings = DarwinInitializationSettings();
+    const DarwinInitializationSettings iosSettings = DarwinInitializationSettings(
+      requestAlertPermission: false,
+      requestBadgePermission: false,
+      requestSoundPermission: false,
+    );
 
     const InitializationSettings settings =
         InitializationSettings(android: androidSettings, iOS: iosSettings);
@@ -75,11 +84,19 @@ class NotificationService {
       return true;
     }
 
-    final PermissionStatus status = await Permission.notification.request();
-    if (status.isGranted) {
+    // If permanently denied, user must go to settings.
+    final PermissionStatus status = await Permission.notification.status;
+    if (status.isPermanentlyDenied) {
+      await openAppSettings();
+      return false;
+    }
+
+    final PermissionStatus result = await Permission.notification.request();
+    if (result.isGranted) {
       return true;
     }
 
+    // Also request via the plugin for completeness.
     await _plugin
         .resolvePlatformSpecificImplementation<
             AndroidFlutterLocalNotificationsPlugin>()
@@ -138,7 +155,7 @@ class NotificationService {
           tz.TZDateTime.from(scheduleAt, tz.local),
           const NotificationDetails(
             android: AndroidNotificationDetails(
-              'event_counter_events',
+              _kEventChannel,
               'Event Reminders',
               importance: Importance.max,
               priority: Priority.high,
@@ -161,7 +178,7 @@ class NotificationService {
             tz.TZDateTime.from(scheduleAt, tz.local),
             const NotificationDetails(
               android: AndroidNotificationDetails(
-                'event_counter_events',
+                _kEventChannel,
                 'Event Reminders',
                 importance: Importance.max,
                 priority: Priority.high,
@@ -206,12 +223,12 @@ class NotificationService {
     try {
       await _plugin.periodicallyShow(
         999001,
-        'Event Counter Habit Reminder',
-        'Open Event Counter and check in your habits today.',
+        'Daymark Habit Reminder',
+        'Open Daymark and check in your habits today.',
         RepeatInterval.daily,
         const NotificationDetails(
           android: AndroidNotificationDetails(
-            'event_counter_habits',
+            _kHabitChannel,
             'Habit Reminders',
             importance: Importance.high,
             priority: Priority.high,
@@ -225,12 +242,12 @@ class NotificationService {
       if (e is PlatformException && e.code == 'exact_alarms_not_permitted') {
         await _plugin.periodicallyShow(
           999001,
-          'Event Counter Habit Reminder',
-          'Open Event Counter and check in your habits today.',
+          'Daymark Habit Reminder',
+          'Open Daymark and check in your habits today.',
           RepeatInterval.daily,
           const NotificationDetails(
             android: AndroidNotificationDetails(
-              'event_counter_habits',
+              _kHabitChannel,
               'Habit Reminders',
               importance: Importance.high,
               priority: Priority.high,
@@ -239,6 +256,104 @@ class NotificationService {
           ),
           androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
         );
+      } else {
+        rethrow;
+      }
+    }
+  }
+
+  // ── Live / Today's events notification ─────────────────────────────────────
+
+  /// Shows a live notification listing today's events.
+  /// Call this once at app start (and again whenever events change).
+  Future<void> showLiveEventNotification(List<EventModel> allEvents) async {
+    await _ensureInitialized();
+    if (!_isSupportedPlatform) return;
+
+    final DateTime today = DateTime.now();
+    final List<EventModel> todayEvents = allEvents.where((EventModel e) {
+      final DateTime next = e.nextOccurrenceDate;
+      return next.year == today.year &&
+          next.month == today.month &&
+          next.day == today.day;
+    }).toList();
+
+    if (todayEvents.isEmpty) {
+      await _plugin.cancel(999002);
+      return;
+    }
+
+    final String title = todayEvents.length == 1
+        ? '${todayEvents.first.emoji} ${todayEvents.first.title} is today!'
+        : '${todayEvents.length} events happening today!';
+    final String body = todayEvents
+        .map((EventModel e) => '${e.emoji} ${e.title}')
+        .join(' · ');
+
+    await _plugin.show(
+      999002,
+      title,
+      body,
+      const NotificationDetails(
+        android: AndroidNotificationDetails(
+          _kLiveChannel,
+          'Live Event Alerts',
+          channelDescription: 'Notifies you when events are happening today',
+          importance: Importance.high,
+          priority: Priority.high,
+          styleInformation: BigTextStyleInformation(''),
+        ),
+        iOS: DarwinNotificationDetails(
+          presentAlert: true,
+          presentBadge: true,
+          presentSound: true,
+        ),
+      ),
+    );
+  }
+
+  /// Schedules a daily morning notification (8 AM) summarising today's events.
+  Future<void> scheduleTodayEventsNotification() async {
+    await _ensureInitialized();
+    if (!_isSupportedPlatform) return;
+
+    // Cancel any existing schedule first.
+    await _plugin.cancel(999003);
+
+    final tz.TZDateTime now = tz.TZDateTime.now(tz.local);
+    tz.TZDateTime scheduledDate =
+        tz.TZDateTime(tz.local, now.year, now.month, now.day, 8, 0);
+    if (scheduledDate.isBefore(now)) {
+      scheduledDate = scheduledDate.add(const Duration(days: 1));
+    }
+
+    Future<void> _doSchedule(AndroidScheduleMode mode) async {
+      await _plugin.zonedSchedule(
+        999003,
+        '📅 Good morning!',
+        'Check your events and habits for today in Daymark.',
+        scheduledDate,
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            _kLiveChannel,
+            'Live Event Alerts',
+            importance: Importance.defaultImportance,
+            priority: Priority.defaultPriority,
+          ),
+          iOS: DarwinNotificationDetails(),
+        ),
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        androidScheduleMode: mode,
+        matchDateTimeComponents: DateTimeComponents.time,
+      );
+    }
+
+    try {
+      await _doSchedule(AndroidScheduleMode.exactAllowWhileIdle);
+    } catch (e) {
+      if (e is PlatformException && e.code == 'exact_alarms_not_permitted') {
+        await _doSchedule(AndroidScheduleMode.inexactAllowWhileIdle);
       } else {
         rethrow;
       }

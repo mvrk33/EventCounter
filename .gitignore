@@ -10,7 +10,6 @@ build/
 # IDE
 .idea/
 .vscode/
-.run/
 *.iml
 
 # Firebase secrets

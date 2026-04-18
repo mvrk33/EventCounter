@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:csv/csv.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../../../core/pin_security_service.dart';
@@ -87,11 +88,50 @@ class ExportService {
     }
 
     final String raw = await file.readAsString();
+    return _parseEventsFromRawJson(raw, security: security);
+  }
+
+  Future<List<EventModel>> importEventsJsonFromPicker({
+    PinSecurityService? security,
+  }) async {
+    final FilePickerResult? result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: <String>['json'],
+      withData: true,
+    );
+    if (result == null || result.files.isEmpty) {
+      return <EventModel>[];
+    }
+
+    final PlatformFile picked = result.files.single;
+    final String? path = picked.path;
+    final String raw;
+    if (picked.bytes != null) {
+      raw = utf8.decode(picked.bytes!, allowMalformed: true);
+    } else if (path != null && path.isNotEmpty) {
+      raw = await File(path).readAsString();
+    } else {
+      return <EventModel>[];
+    }
+
+    return _parseEventsFromRawJson(raw, security: security);
+  }
+
+  Future<List<EventModel>> _parseEventsFromRawJson(
+    String raw, {
+    PinSecurityService? security,
+  }) async {
     if (raw.trim().isEmpty) {
       return <EventModel>[];
     }
 
-    final dynamic decoded = jsonDecode(raw);
+    dynamic decoded;
+    try {
+      decoded = jsonDecode(raw);
+    } on FormatException {
+      return <EventModel>[];
+    }
+
     List<dynamic> list;
 
     if (decoded is Map<String, dynamic> && decoded['encrypted'] == true) {

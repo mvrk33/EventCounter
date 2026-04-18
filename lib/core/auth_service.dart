@@ -15,7 +15,7 @@ final StreamProvider<User?> authStateChangesProvider = StreamProvider<User?>((Re
 
 class AuthService {
   static const String _googleServerClientId =
-      '194429762916-k5bp4dj5m5o0ill85hudrc41c3ac9rgn.apps.googleusercontent.com';
+      '469114218525-l169tmdmmg0uavkk5q6svuq9c4m72isv.apps.googleusercontent.com';
 
   AuthService({FirebaseAuth? firebaseAuth, GoogleSignIn? googleSignIn})
       : _auth = firebaseAuth ?? FirebaseAuth.instance,

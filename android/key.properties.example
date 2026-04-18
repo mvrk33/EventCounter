@@ -1,0 +1,9 @@
+# Copy this file to android/key.properties and fill in real values.
+# Keep android/key.properties out of version control.
+storePassword=CHANGE_ME_STORE_PASSWORD
+keyPassword=CHANGE_ME_KEY_PASSWORD
+keyAlias=upload
+# Path is relative to the android/ folder.
+# Example: upload-keystore.jks
+storeFile=upload-keystore.jks
+

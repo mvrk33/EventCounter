@@ -44,6 +44,10 @@ Future<void> main() async {
 
   final NotificationService notifications = NotificationService();
   await notifications.initialize();
+  // Request OS permission on first launch (standard practice: ask once).
+  await notifications.requestPermissionsOnFirstLaunch();
+  // Schedule a "Today's Events" summary notification every morning.
+  await notifications.scheduleTodayEventsNotification();
 
   runApp(const ProviderScope(child: EventCounterApp()));
 }

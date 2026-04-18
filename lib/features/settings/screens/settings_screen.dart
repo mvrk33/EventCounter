@@ -264,14 +264,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       trailing: OutlinedButton(
                         onPressed: () async {
                           final imported = await _exportService
-                              .importEventsJsonFromDefaultFile(
+                              .importEventsJsonFromPicker(
                             security: pinSecurity,
                           );
                           if (imported.isEmpty) {
                             if (mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
-                                    content: Text('No import file found.')),
+                                    content: Text('No JSON backup selected or readable.')),
                               );
                             }
                             return;

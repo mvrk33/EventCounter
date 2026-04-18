@@ -1,4 +1,4 @@
-package com.daymark.app
+package com.mvrk.event_counter
 
 import android.appwidget.AppWidgetManager
 import android.content.ComponentName

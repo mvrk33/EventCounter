@@ -1,4 +1,4 @@
-package com.daymark.app
+package com.mvrk.event_counter
 
 import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
