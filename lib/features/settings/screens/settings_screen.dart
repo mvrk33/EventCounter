@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:share_plus/share_plus.dart';
@@ -253,7 +255,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                       ? await _promptForExportPassphrase()
                                       : null,
                                 );
-                                await _shareFiles(<XFile>[XFile(file.path)]);
+                                if (!mounted) return;
+                                _showExportOptions(context, file);
                               },
                         child: const Text('Export'),
                       ),
@@ -270,7 +273,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             : () async {
                                 final file = await _exportService
                                     .exportEventsCsv(events);
-                                await _shareFiles(<XFile>[XFile(file.path)]);
+                                if (!mounted) return;
+                                _showExportOptions(context, file);
                               },
                         child: const Text('Export'),
                       ),
@@ -550,6 +554,106 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             child: const Text('Export'),
           ),
         ],
+      ),
+    );
+  }
+
+  Future<void> _showExportOptions(BuildContext context, File file) async {
+    if (!mounted) return;
+    final filename = file.path.split('/').last;
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (BuildContext ctx) => Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: Text(
+                'Export: $filename',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.share_rounded),
+              title: const Text('Share'),
+              subtitle: const Text('Send via email, messaging, etc.'),
+              onTap: () async {
+                Navigator.of(ctx).pop();
+                await _shareFiles(<XFile>[XFile(file.path)]);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.save_rounded),
+              title: const Text('Save to device'),
+              subtitle: const Text('Save to Downloads or Documents'),
+              onTap: () async {
+                Navigator.of(ctx).pop();
+                await _saveToDownloads(file);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.copy_rounded),
+              title: const Text('Copy file path'),
+              subtitle: const Text('Copy to clipboard'),
+              onTap: () {
+                Navigator.of(ctx).pop();
+                _copyToClipboard(file.path);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _saveToDownloads(File sourceFile) async {
+    try {
+      final Directory downloadsDir = Directory('/storage/emulated/0/Download');
+      if (!await downloadsDir.exists()) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+                content: Text('Downloads directory not found on this device.')),
+          );
+        }
+        return;
+      }
+
+      final String filename = sourceFile.path.split('/').last;
+      final File savedFile = File('${downloadsDir.path}/$filename');
+      await sourceFile.copy(savedFile.path);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Saved to Downloads: $filename'),
+            action: SnackBarAction(
+              label: 'Open',
+              onPressed: () {
+                // On Android, can't directly open file manager from Flutter,
+                // but user can navigate manually
+              },
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Save failed: $e')),
+        );
+      }
+    }
+  }
+
+  void _copyToClipboard(String text) {
+    Clipboard.setData(ClipboardData(text: text));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('File path copied to clipboard'),
+        duration: const Duration(seconds: 2),
       ),
     );
   }
