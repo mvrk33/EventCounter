@@ -289,11 +289,84 @@ class _EventDetailModalState extends ConsumerState<EventDetailModal> {
                                         d == 0 ? 'On day' : '$d d before')
                                     .join(', '),
                             iconColor: accentColor,
+                          ),
+                          if (event.duration != null)
+                            _InfoRow(
+                              icon: Icons.access_time_rounded,
+                              label: 'Est. Duration',
+                              value: '${event.duration!.inHours}h ${event.duration!.inMinutes % 60}m',
+                              iconColor: accentColor,
+                            ),
+                          _InfoRow(
+                            icon: Icons.mood_rounded,
+                            label: 'Predicted Mood',
+                            value: event.mood ?? 'Neutral',
+                            iconColor: accentColor,
+                          ),
+                          _InfoRow(
+                            icon: Icons.commute_rounded,
+                            label: 'Travel Needed',
+                            value: event.requiresTravel ? 'Yes' : 'No',
+                            iconColor: accentColor,
                             isLast: true,
                           ),
                         ],
                       ),
                     ),
+                    // ── Checklist ──────────────────────────────────────────
+                    if (event.checklist.isNotEmpty) ...<Widget>[
+                      const SizedBox(height: 16),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: scheme.surface,
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: <BoxShadow>[
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.04),
+                              blurRadius: 10,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        padding: const EdgeInsets.all(18),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: <Widget>[
+                            Row(
+                              children: <Widget>[
+                                Icon(Icons.checklist_rounded,
+                                    color: accentColor, size: 18),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Preparation Checklist',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .titleSmall
+                                      ?.copyWith(color: accentColor),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            ...event.checklist.map((item) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 8),
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.check_circle_outline_rounded,
+                                          size: 16, color: accentColor.withValues(alpha: 0.6)),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Text(
+                                          item,
+                                          style: Theme.of(context).textTheme.bodyMedium,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                )),
+                          ],
+                        ),
+                      ),
+                    ],
                     // ── Notes ──────────────────────────────────────────
                     if (event.notes.isNotEmpty) ...<Widget>[
                       const SizedBox(height: 16),

@@ -64,19 +64,50 @@ class EventCardPolished extends StatelessWidget {
             onTap: onTap,
             splashColor: accent.withValues(alpha: 0.05),
             highlightColor: accent.withValues(alpha: 0.02),
-            child: Padding(
-              padding: EdgeInsets.fromLTRB(
-                  16, comfortable ? 18 : 14, 12, comfortable ? 18 : 14),
-              child: comfortable
-                  ? _buildComfortableLayout(
-                      context, accent, value, compactDescription, fullDescription)
-                  : _buildCompactLayout(
-                      context, accent, value, compactDescription, scheme),
+            child: Stack(
+              children: [
+                // ── Visual Theme Layer ─────────────────────────────────────
+                if (event.visualTheme != null)
+                  Positioned.fill(
+                    child: _buildVisualThemeLayer(event.visualTheme!, accent),
+                  ),
+                Padding(
+                  padding: EdgeInsets.fromLTRB(
+                      16, comfortable ? 18 : 14, 12, comfortable ? 18 : 14),
+                  child: comfortable
+                      ? _buildComfortableLayout(
+                          context, accent, value, compactDescription, fullDescription)
+                      : _buildCompactLayout(
+                          context, accent, value, compactDescription, scheme),
+                ),
+              ],
             ),
           ),
         ),
       ),
     );
+  }
+
+  Widget _buildVisualThemeLayer(String theme, Color accent) {
+    switch (theme) {
+      case 'ocean_waves':
+        return Opacity(
+          opacity: 0.08,
+          child: CustomPaint(painter: _WavePainter(color: accent)),
+        );
+      case 'pine_trees':
+        return Opacity(
+          opacity: 0.06,
+          child: CustomPaint(painter: _TreePainter(color: accent)),
+        );
+      case 'coffee_steam':
+        return Opacity(
+          opacity: 0.1,
+          child: CustomPaint(painter: _SteamPainter(color: accent)),
+        );
+      default:
+        return const SizedBox.shrink();
+    }
   }
 
   Widget _buildComfortableLayout(
@@ -130,6 +161,36 @@ class EventCardPolished extends StatelessWidget {
             _buildCountBadge(context, accent, value, compactDescription, large: true),
           ],
         ),
+        // ── Metadata Pills (Mood, Checklist) ─────────────────────────────────
+        if (event.mood != null || event.checklist.isNotEmpty || event.requiresTravel) ...[
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            children: [
+              if (event.mood != null)
+                _buildSmallPill(
+                  context,
+                  event.mood == 'High Energy' ? Icons.bolt_rounded : Icons.self_improvement_rounded,
+                  event.mood!,
+                  accent,
+                ),
+              if (event.checklist.isNotEmpty)
+                _buildSmallPill(
+                  context,
+                  Icons.checklist_rounded,
+                  '${event.checklist.length} tasks',
+                  accent,
+                ),
+              if (event.requiresTravel)
+                _buildSmallPill(
+                  context,
+                  Icons.flight_takeoff_rounded,
+                  'Travel',
+                  accent,
+                ),
+            ],
+          ),
+        ],
         if (event.notes.trim().isNotEmpty) ...<Widget>[
           const SizedBox(height: 10),
           Text(
@@ -443,4 +504,100 @@ class EventCardPolished extends StatelessWidget {
       overflow: TextOverflow.ellipsis,
     );
   }
+
+  Widget _buildSmallPill(BuildContext context, IconData icon, String label, Color accent) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: accent.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: accent.withValues(alpha: 0.1)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: accent.withValues(alpha: 0.7)),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: accent.withValues(alpha: 0.8),
+                  fontWeight: FontWeight.w700,
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _WavePainter extends CustomPainter {
+  _WavePainter({required this.color});
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+    final path = Path();
+    path.moveTo(0, size.height * 0.8);
+    path.quadraticBezierTo(size.width * 0.25, size.height * 0.7, size.width * 0.5, size.height * 0.8);
+    path.quadraticBezierTo(size.width * 0.75, size.height * 0.9, size.width, size.height * 0.8);
+    path.lineTo(size.width, size.height);
+    path.lineTo(0, size.height);
+    path.close();
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _TreePainter extends CustomPainter {
+  _TreePainter({required this.color});
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+    final path = Path();
+    for (var i = 0; i < 3; i++) {
+      final x = 20.0 + (i * 60.0);
+      path.moveTo(x, size.height - 10);
+      path.lineTo(x + 20, size.height - 50);
+      path.lineTo(x + 40, size.height - 10);
+      path.close();
+    }
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _SteamPainter extends CustomPainter {
+  _SteamPainter({required this.color});
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2;
+    for (var i = 0; i < 3; i++) {
+      final x = size.width - 40.0 - (i * 15.0);
+      final path = Path();
+      path.moveTo(x, 40);
+      path.quadraticBezierTo(x + 5, 30, x, 20);
+      path.quadraticBezierTo(x - 5, 10, x, 0);
+      canvas.drawPath(path, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

@@ -195,101 +195,105 @@ class _AddEditEventScreenState extends ConsumerState<AddEditEventScreen> {
       child: Scaffold(
         backgroundColor: themeBg,
         body: CustomScrollView(
-        slivers: [
-          SliverAppBar.large(
-            title: Text(
-              editing ? 'Edit Event' : 'New Event',
-              style: GoogleFonts.nunito(fontWeight: FontWeight.w900),
-            ),
-            leading: IconButton(
-              icon: const Icon(Icons.close_rounded),
-              onPressed: () => Navigator.of(context).pop(),
-            ),
-            centerTitle: false,
-            backgroundColor: scheme.surface,
-            surfaceTintColor: Colors.transparent,
-            stretch: true,
-          ),
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 140),
-            sliver: SliverList(
-              delegate: SliverChildListDelegate([
-                // ── Title field with smart suggestion ──────────────────────────
-                _buildTitleField(context, scheme),
-                // ── Smart suggestion banner ────────────────────────────────────
-                AnimatedSize(
-                  duration: const Duration(milliseconds: 260),
-                  curve: Curves.easeInOut,
-                  child: _pendingSuggestion != null
-                      ? _buildSuggestionBanner(context, scheme)
-                      : const SizedBox.shrink(),
-                ),
-                const SizedBox(height: 16),
-                // ── Date ───────────────────────────────────────────────────────
-                _buildDateTile(context, scheme),
-                const SizedBox(height: 24),
-                // ── Count unit ─────────────────────────────────────────────
-                _buildCountUnitSection(context, scheme),
-                const SizedBox(height: 24),
-                // ── Recurrence ─────────────────────────────────────────────
-                _buildRecurrenceSection(context, scheme),
-                const SizedBox(height: 24),
-                // ── Reminders ──────────────────────────────────────────────
-                _buildRemindersSection(context, scheme),
-                const SizedBox(height: 24),
-                // ── Notes ──────────────────────────────────────────────────
-                _buildNotesField(context, scheme),
-                const SizedBox(height: 24),
-                // ── Advanced section ───────────────────────────────────────────
-                _buildAdvancedSection(context, scheme),
-              ]),
-            ),
-          ),
-        ],
-      ),
-      // ── Sticky save bar ────────────────────────────────────────────────
-      bottomNavigationBar: Container(
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
-        decoration: BoxDecoration(
-          color: scheme.surface.withValues(alpha: 0.8),
-          border: Border(
-            top: BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.3)),
-          ),
-        ),
-        child: SafeArea(
-          child: Container(
-            decoration: BoxDecoration(
-              boxShadow: [
-                BoxShadow(
-                  color: scheme.primary.withValues(alpha: 0.2),
-                  blurRadius: 20,
-                  offset: const Offset(0, 8),
-                ),
-              ],
-            ),
-            child: FilledButton(
-              onPressed: _save,
-              style: FilledButton.styleFrom(
-                minimumSize: const Size(double.infinity, 56),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                backgroundColor: scheme.primary,
-                foregroundColor: scheme.onPrimary,
+          slivers: [
+            SliverAppBar.large(
+              title: Text(
+                editing ? 'Edit Event' : 'New Event',
+                style: GoogleFonts.nunito(fontWeight: FontWeight.w900),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(editing ? Icons.check_rounded : Icons.add_rounded),
-                  const SizedBox(width: 10),
-                  Text(
-                    editing ? 'Update Event' : 'Create Event',
-                    style: GoogleFonts.nunito(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                    ),
+              leading: IconButton(
+                icon: const Icon(Icons.close_rounded),
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+              centerTitle: false,
+              backgroundColor: scheme.surface,
+              surfaceTintColor: Colors.transparent,
+              stretch: true,
+            ),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 140),
+              sliver: SliverList(
+                delegate: SliverChildListDelegate([
+                  // ── Title field with smart suggestion ──────────────────────────
+                  _buildTitleField(context, scheme),
+                  // ── Smart suggestion banner ────────────────────────────────────
+                  AnimatedSize(
+                    duration: const Duration(milliseconds: 260),
+                    curve: Curves.easeInOut,
+                    child: _pendingSuggestion != null
+                        ? _buildSuggestionBanner(context, scheme)
+                        : const SizedBox.shrink(),
+                  ),
+                  const SizedBox(height: 16),
+                  // ── Date ───────────────────────────────────────────────────────
+                  _buildDateTile(context, scheme),
+                  const SizedBox(height: 24),
+                  // ── Count unit ─────────────────────────────────────────────
+                  _buildCountUnitSection(context, scheme),
+                  const SizedBox(height: 24),
+                  // ── Recurrence ─────────────────────────────────────────────
+                  _buildRecurrenceSection(context, scheme),
+                  const SizedBox(height: 24),
+                  // ── Reminders ──────────────────────────────────────────────
+                  _buildRemindersSection(context, scheme),
+                  const SizedBox(height: 24),
+                  // ── Notes ──────────────────────────────────────────────────
+                  _buildNotesField(context, scheme),
+                  const SizedBox(height: 24),
+                  // ── Checklist ──────────────────────────────────────────────
+                  _buildChecklistSection(context, scheme),
+                  const SizedBox(height: 24),
+                  // ── Advanced section ───────────────────────────────────────────
+                  _buildAdvancedSection(context, scheme),
+                ]),
+              ),
+            ),
+          ],
+        ),
+        // ── Sticky save bar ────────────────────────────────────────────────
+        bottomNavigationBar: Container(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+          decoration: BoxDecoration(
+            color: scheme.surface.withValues(alpha: 0.8),
+            border: Border(
+              top: BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.3)),
+            ),
+          ),
+          child: SafeArea(
+            child: Container(
+              decoration: BoxDecoration(
+                boxShadow: [
+                  BoxShadow(
+                    color: scheme.primary.withValues(alpha: 0.2),
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
                   ),
                 ],
+              ),
+              child: FilledButton(
+                onPressed: _save,
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size(double.infinity, 56),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  backgroundColor: scheme.primary,
+                  foregroundColor: scheme.onPrimary,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(editing ? Icons.check_rounded : Icons.add_rounded),
+                    const SizedBox(width: 10),
+                    Text(
+                      editing ? 'Update Event' : 'Create Event',
+                      style: GoogleFonts.nunito(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -777,7 +781,6 @@ class _AddEditEventScreenState extends ConsumerState<AddEditEventScreen> {
                   label: _reminderLabel(s.suggestedReminderDays),
                   accent: accent,
                 ),
-              if (s.suggestedDate != null) const SizedBox(width: 6),
               if (s.suggestedDate != null)
                 _PreviewPill(
                   icon: Icons.calendar_today_rounded,
@@ -1311,6 +1314,72 @@ class _AddEditEventScreenState extends ConsumerState<AddEditEventScreen> {
     );
   }
 
+  Widget _buildChecklistSection(BuildContext context, ColorScheme scheme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const _SectionLabel(icon: Icons.checklist_rounded, label: 'Preparation Checklist'),
+        const SizedBox(height: 12),
+        _FormCard(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              if (_checklist.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Text(
+                    'No tasks added yet.',
+                    style: GoogleFonts.nunito(
+                      fontSize: 14,
+                      color: scheme.onSurface.withValues(alpha: 0.4),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                )
+              else
+                ..._checklist.asMap().entries.map((entry) {
+                  final int index = entry.key;
+                  final String item = entry.value;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      children: [
+                        Icon(Icons.circle_outlined, size: 20, color: scheme.primary.withValues(alpha: 0.5)),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            item,
+                            style: GoogleFonts.nunito(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: scheme.onSurface,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.remove_circle_outline_rounded, size: 20),
+                          onPressed: () => setState(() => _checklist.removeAt(index)),
+                          color: scheme.error.withValues(alpha: 0.7),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+              const Divider(height: 24),
+              _AddChecklistItemField(
+                onAdd: (newItem) {
+                  setState(() {
+                    _checklist.add(newItem);
+                  });
+                },
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildAdvancedSection(BuildContext context, ColorScheme scheme) {
     return Column(
       children: <Widget>[
@@ -1378,6 +1447,105 @@ class _AddEditEventScreenState extends ConsumerState<AddEditEventScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
+        // Smart Metadata (Mood, Travel, Duration)
+        const _SectionLabel(icon: Icons.auto_awesome_rounded, label: 'Smart Metadata'),
+        const SizedBox(height: 12),
+        _FormCard(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              // Mood
+              Row(
+                children: [
+                  Icon(Icons.mood_rounded, size: 20, color: scheme.primary.withValues(alpha: 0.6)),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text('Predicted Mood', style: GoogleFonts.nunito(fontWeight: FontWeight.w700)),
+                  ),
+                  DropdownButton<String>(
+                    value: _mood,
+                    hint: const Text('None'),
+                    underline: const SizedBox(),
+                    items: ['High Energy', 'Low Energy'].map((String value) {
+                      return DropdownMenuItem<String>(
+                        value: value,
+                        child: Text(value, style: GoogleFonts.nunito(fontWeight: FontWeight.w700)),
+                      );
+                    }).toList(),
+                    onChanged: (v) => setState(() => _mood = v),
+                  ),
+                  if (_mood != null)
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded, size: 16),
+                      onPressed: () => setState(() => _mood = null),
+                    ),
+                ],
+              ),
+              const Divider(height: 24),
+              // Travel
+              Row(
+                children: [
+                  Icon(Icons.commute_rounded, size: 20, color: scheme.primary.withValues(alpha: 0.6)),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Requires Travel', style: GoogleFonts.nunito(fontWeight: FontWeight.w700)),
+                        Text('Adds buffer time for transit', style: GoogleFonts.nunito(fontSize: 11, color: scheme.onSurface.withValues(alpha: 0.5))),
+                      ],
+                    ),
+                  ),
+                  Switch.adaptive(
+                    value: _requiresTravel,
+                    onChanged: (v) => setState(() => _requiresTravel = v),
+                    activeColor: scheme.primary,
+                  ),
+                ],
+              ),
+              const Divider(height: 24),
+              // Duration
+              Row(
+                children: [
+                  Icon(Icons.timer_rounded, size: 20, color: scheme.primary.withValues(alpha: 0.6)),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text('Est. Duration', style: GoogleFonts.nunito(fontWeight: FontWeight.w700)),
+                  ),
+                  TextButton(
+                    onPressed: () async {
+                      final time = await showTimePicker(
+                        context: context,
+                        initialTime: TimeOfDay(
+                          hour: _duration?.inHours ?? 1,
+                          minute: (_duration?.inMinutes ?? 0) % 60,
+                        ),
+                        helpText: 'Select Duration',
+                      );
+                      if (time != null) {
+                        setState(() {
+                          _duration = Duration(hours: time.hour, minutes: time.minute);
+                        });
+                      }
+                    },
+                    child: Text(
+                      _duration == null
+                          ? 'Set duration'
+                          : '${_duration!.inHours}h ${_duration!.inMinutes % 60}m',
+                      style: GoogleFonts.nunito(fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                  if (_duration != null)
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded, size: 16),
+                      onPressed: () => setState(() => _duration = null),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 24),
         // Category
         const _SectionLabel(icon: Icons.label_outline_rounded, label: 'Category'),
         const SizedBox(height: 12),
@@ -1716,6 +1884,60 @@ class _FormCard extends StatelessWidget {
 
 // ── Banner helper widgets ─────────────────────────────────────────────────────
 
+class _AddChecklistItemField extends StatefulWidget {
+  const _AddChecklistItemField({required this.onAdd});
+  final Function(String) onAdd;
+
+  @override
+  State<_AddChecklistItemField> createState() => _AddChecklistItemFieldState();
+}
+
+class _AddChecklistItemFieldState extends State<_AddChecklistItemField> {
+  final _controller = TextEditingController();
+
+  void _submit() {
+    final text = _controller.text.trim();
+    if (text.isNotEmpty) {
+      widget.onAdd(text);
+      _controller.clear();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Row(
+      children: [
+        Expanded(
+          child: TextField(
+            controller: _controller,
+            style: GoogleFonts.nunito(fontSize: 14, fontWeight: FontWeight.w700),
+            decoration: InputDecoration(
+              hintText: 'Add a task...',
+              hintStyle: GoogleFonts.nunito(color: scheme.onSurface.withValues(alpha: 0.3)),
+              isDense: true,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.5)),
+              ),
+            ),
+            onSubmitted: (_) => _submit(),
+          ),
+        ),
+        const SizedBox(width: 8),
+        IconButton.filledTonal(
+          onPressed: _submit,
+          icon: const Icon(Icons.add_rounded),
+          style: IconButton.styleFrom(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _EmojiChip extends StatelessWidget {
   const _EmojiChip({
     required this.emoji,
@@ -1793,4 +2015,3 @@ class _PreviewPill extends StatelessWidget {
     );
   }
 }
-
