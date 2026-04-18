@@ -2,11 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/auth_service.dart';
+import '../core/pin_security_service.dart';
 import '../core/sync_service.dart';
+import '../features/auth/screens/app_lock_screen.dart';
 import '../features/notifications/notification_service.dart';
 import '../features/settings/screens/settings_screen.dart';
 import '../shared/theme/app_theme.dart';
 import 'router.dart';
+
+/// True when the app lock screen should be shown.
+final StateProvider<bool> appLockedProvider =
+    StateProvider<bool>((Ref ref) => false);
 
 class EventCounterApp extends ConsumerStatefulWidget {
   const EventCounterApp({super.key, this.startupError});
@@ -17,18 +23,45 @@ class EventCounterApp extends ConsumerStatefulWidget {
   ConsumerState<EventCounterApp> createState() => _EventCounterAppState();
 }
 
-class _EventCounterAppState extends ConsumerState<EventCounterApp> {
+class _EventCounterAppState extends ConsumerState<EventCounterApp>
+    with WidgetsBindingObserver {
   bool _isInitializing = true;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeApp();
     });
   }
 
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Lock the app when it goes to background if app lock is enabled.
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
+      final PinSecurityService pinSecurity =
+          ref.read(pinSecurityServiceProvider);
+      if (pinSecurity.isAppLockEnabled) {
+        ref.read(appLockedProvider.notifier).state = true;
+      }
+    }
+  }
+
   Future<void> _initializeApp() async {
+    // Lock on first launch if app lock is enabled.
+    final PinSecurityService pinSecurity = ref.read(pinSecurityServiceProvider);
+    if (pinSecurity.isAppLockEnabled) {
+      ref.read(appLockedProvider.notifier).state = true;
+    }
+
     if (mounted) {
       setState(() => _isInitializing = false);
     }
@@ -51,6 +84,7 @@ class _EventCounterAppState extends ConsumerState<EventCounterApp> {
   @override
   Widget build(BuildContext context) {
     final themeMode = ref.watch(themeModeProvider);
+    final bool isLocked = ref.watch(appLockedProvider);
 
     if (widget.startupError != null) {
       return MaterialApp(
@@ -83,6 +117,16 @@ class _EventCounterAppState extends ConsumerState<EventCounterApp> {
       themeMode: themeMode,
       routerConfig: router,
       debugShowCheckedModeBanner: false,
+      builder: (BuildContext context, Widget? child) {
+        if (isLocked) {
+          return AppLockScreen(
+            onUnlocked: () {
+              ref.read(appLockedProvider.notifier).state = false;
+            },
+          );
+        }
+        return child ?? const SizedBox.shrink();
+      },
     );
   }
 }
@@ -138,6 +182,4 @@ class _StartupFailureScreen extends StatelessWidget {
     );
   }
 }
-
-
 

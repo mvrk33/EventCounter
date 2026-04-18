@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:local_auth/local_auth.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -41,7 +43,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   late final ShareFilesCallback _shareFiles;
   int _developerTapCount = 0;
   Timer? _developerTapReset;
-  String? _passphraseInput;
 
   static final Uri _githubUri = Uri.parse('https://github.com/mvrk33');
 
@@ -65,10 +66,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final SyncService syncService = ref.read(syncServiceProvider);
     final events = ref.watch(eventsProvider);
     final PinSecurityService pinSecurity = ref.read(pinSecurityServiceProvider);
-    final bool localEncryptionEnabled =
-        pinSecurity.isLocalBackupEncryptionEnabled;
-    final bool cloudEncryptionEnabled =
-        pinSecurity.isCloudBackupEncryptionEnabled;
     final scheme = Theme.of(context).colorScheme;
     final user = authState.value;
     final bool isSignedIn = user != null;
@@ -269,10 +266,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                     await _exportService.exportEventsJson(
                                   events,
                                   security: pinSecurity,
-                                  passphraseForBackup: pinSecurity
-                                          .isPassphraseBackupEncryptionEnabled
-                                      ? await _promptForExportPassphrase()
-                                      : null,
                                 );
                                 if (!mounted) return;
                                 _showExportOptions(context, file);
@@ -343,38 +336,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     _SettingsRow(
                       icon: Icons.lock_rounded,
                       iconColor: const Color(0xFF5E35B1),
-                      title: 'Encrypt local backup file',
-                      subtitle: 'On by default for new backup exports',
-                      trailing: Switch(
-                        value: localEncryptionEnabled,
-                        onChanged: (bool value) =>
-                            _setLocalBackupEncryption(value),
-                      ),
+                      title: 'Encrypt data',
+                      subtitle: 'AES-256 encryption is always on for local and cloud backups',
+                      trailing: const Icon(Icons.check_circle_rounded,
+                          color: Color(0xFF43A047)),
                     ),
                     _SettingsDivider(),
                     _SettingsRow(
-                      icon: Icons.storage_rounded,
-                      iconColor: const Color(0xFF00897B),
-                      title: 'Encrypt cloud backup sync',
+                      icon: Icons.fingerprint_rounded,
+                      iconColor: const Color(0xFF1565C0),
+                      title: 'App lock',
                       subtitle:
-                          'Encrypts event/habit payloads before upload to cloud',
+                          'Require fingerprint, face ID, or device PIN to open the app',
                       trailing: Switch(
-                        value: cloudEncryptionEnabled,
-                        onChanged: (bool value) =>
-                            _setCloudBackupEncryption(value),
-                      ),
-                    ),
-                    _SettingsDivider(),
-                    _SettingsRow(
-                      icon: Icons.vpn_key_rounded,
-                      iconColor: const Color(0xFFD32F2F),
-                      title: 'Passphrase-protected backups',
-                      subtitle:
-                          'Portable cross-device restore with a passphrase',
-                      trailing: Switch(
-                        value: pinSecurity.isPassphraseBackupEncryptionEnabled,
-                        onChanged: (bool value) =>
-                            _setPassphraseBackupEncryption(value),
+                        value: pinSecurity.isAppLockEnabled,
+                        onChanged: (bool value) => _setAppLock(value),
                       ),
                     ),
                   ],
@@ -485,96 +461,43 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
   }
 
-  Future<void> _setLocalBackupEncryption(bool enabled) async {
+  Future<void> _setAppLock(bool enabled) async {
     final PinSecurityService pinSecurity = ref.read(pinSecurityServiceProvider);
-    await pinSecurity.setLocalBackupEncryptionEnabled(enabled);
-    if (mounted) {
-      setState(() {});
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-            content: Text(enabled
-                ? 'Local backup encryption enabled.'
-                : 'Local backup encryption disabled.')),
-      );
-    }
-  }
-
-  Future<void> _setCloudBackupEncryption(bool enabled) async {
-    final PinSecurityService pinSecurity = ref.read(pinSecurityServiceProvider);
-    await pinSecurity.setCloudBackupEncryptionEnabled(enabled);
-    if (mounted) {
-      setState(() {});
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-            content: Text(enabled
-                ? 'Cloud backup encryption enabled.'
-                : 'Cloud backup encryption disabled.')),
-      );
-    }
-  }
-
-  Future<void> _setPassphraseBackupEncryption(bool enabled) async {
-    final PinSecurityService pinSecurity = ref.read(pinSecurityServiceProvider);
+    final LocalAuthentication localAuth = LocalAuthentication();
 
     if (enabled) {
-      if (!mounted) return;
-      final String? passphrase = await showDialog<String>(
-        context: context,
-        barrierDismissible: false,
-        builder: (BuildContext ctx) => _PassphraseSetupDialog(),
-      );
-
-      if (passphrase != null && passphrase.isNotEmpty) {
-        await pinSecurity.setPassphraseBackupEncryptionEnabled(
-          true,
-          passphrase: passphrase,
-        );
+      // Verify device supports auth before enabling.
+      final bool canAuth = await localAuth.canCheckBiometrics ||
+          await localAuth.isDeviceSupported();
+      if (!canAuth) {
         if (mounted) {
-          setState(() {});
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-                content: Text('Passphrase-protected backups enabled.')),
+                content: Text(
+                    'Your device does not support biometric/PIN authentication.')),
           );
         }
+        return;
       }
-    } else {
-      await pinSecurity.setPassphraseBackupEncryptionEnabled(false);
-      if (mounted) {
-        setState(() {});
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Passphrase-protected backups disabled.')),
-        );
-      }
-    }
-  }
-
-  Future<String?> _promptForExportPassphrase() async {
-    if (!mounted) return null;
-    return showDialog<String>(
-      context: context,
-      builder: (BuildContext ctx) => AlertDialog(
-        title: const Text('Enter passphrase'),
-        content: TextField(
-          obscureText: true,
-          onChanged: (String val) => _passphraseInput = val,
-          decoration: const InputDecoration(
-            labelText: 'Backup passphrase',
-            hintText: 'Your passphrase to protect this export',
-          ),
+      // Confirm identity once before enabling.
+      final bool confirmed = await localAuth.authenticate(
+        localizedReason: 'Confirm your identity to enable app lock',
+        options: const AuthenticationOptions(
+          biometricOnly: false,
+          stickyAuth: true,
         ),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(_passphraseInput),
-            child: const Text('Export'),
-          ),
-        ],
-      ),
-    );
+      );
+      if (!confirmed) return;
+    }
+
+    await pinSecurity.setAppLockEnabled(enabled);
+    if (mounted) {
+      setState(() {});
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text(enabled ? 'App lock enabled.' : 'App lock disabled.')),
+      );
+    }
   }
 
   Future<void> _showExportOptions(BuildContext context, File file) async {
@@ -606,10 +529,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ListTile(
               leading: const Icon(Icons.save_rounded),
               title: const Text('Save to device'),
-              subtitle: const Text('Save to Downloads or Documents'),
+              subtitle: const Text('Choose where to save this backup file'),
               onTap: () async {
                 Navigator.of(ctx).pop();
-                await _saveToDownloads(file);
+                await _saveToDevice(file);
               },
             ),
             ListTile(
@@ -627,33 +550,58 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-  Future<void> _saveToDownloads(File sourceFile) async {
+  Future<void> _saveToDevice(File sourceFile) async {
     try {
-      final Directory downloadsDir = Directory('/storage/emulated/0/Download');
-      if (!await downloadsDir.exists()) {
+      final String filename = sourceFile.path.split('/').last;
+      final Uint8List bytes = await sourceFile.readAsBytes();
+
+      if (Platform.isAndroid || Platform.isIOS) {
+        final String? saved = await FilePicker.platform.saveFile(
+          dialogTitle: 'Save backup file',
+          fileName: filename,
+          bytes: bytes,
+        );
+        if (saved == null || saved.isEmpty) {
+          return;
+        }
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-                content: Text('Downloads directory not found on this device.')),
+            SnackBar(content: Text('Saved backup: $filename')),
           );
         }
         return;
       }
 
-      final String filename = sourceFile.path.split('/').last;
-      final File savedFile = File('${downloadsDir.path}/$filename');
-      await sourceFile.copy(savedFile.path);
+      final String? destinationPath = await FilePicker.platform.saveFile(
+        dialogTitle: 'Save backup file',
+        fileName: filename,
+      );
+
+      if (destinationPath == null || destinationPath.isEmpty) {
+        return;
+      }
+
+      final File destinationFile = File(destinationPath);
+      await destinationFile.parent.create(recursive: true);
+      await destinationFile.writeAsBytes(bytes, flush: true);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Saved backup to: $destinationPath')),
+        );
+      }
+    } on PlatformException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Save failed: ${e.message ?? e.code}')),
+        );
+      }
+    } on FileSystemException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Saved to Downloads: $filename'),
-            action: SnackBarAction(
-              label: 'Open',
-              onPressed: () {
-                // On Android, can't directly open file manager from Flutter,
-                // but user can navigate manually
-              },
+            content: Text(
+              'Save failed (storage access): ${e.message}. Please pick another location.',
             ),
           ),
         );
@@ -830,105 +778,4 @@ class _IconBox extends StatelessWidget {
   }
 }
 
-class _PassphraseSetupDialog extends StatefulWidget {
-  @override
-  State<_PassphraseSetupDialog> createState() => _PassphraseSetupDialogState();
-}
-
-class _PassphraseSetupDialogState extends State<_PassphraseSetupDialog> {
-  late TextEditingController _controller;
-  late TextEditingController _confirmController;
-  bool _obscureText = true;
-  String _errorText = '';
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = TextEditingController();
-    _confirmController = TextEditingController();
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    _confirmController.dispose();
-    super.dispose();
-  }
-
-  void _onConfirm() {
-    final String pass = _controller.text;
-    final String confirm = _confirmController.text;
-
-    if (pass.isEmpty) {
-      setState(() => _errorText = 'Passphrase cannot be empty.');
-      return;
-    }
-
-    if (pass.length < 4) {
-      setState(() => _errorText = 'Passphrase must be at least 4 characters.');
-      return;
-    }
-
-    if (pass != confirm) {
-      setState(() => _errorText = 'Passphrases do not match.');
-      return;
-    }
-
-    Navigator.of(context).pop(pass);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return AlertDialog(
-      title: const Text('Set backup passphrase'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Text(
-            'Create a memorable passphrase to encrypt backups portably across devices.',
-            style: Theme.of(context)
-                .textTheme
-                .bodySmall
-                ?.copyWith(color: scheme.onSurface.withValues(alpha: 0.7)),
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _controller,
-            obscureText: _obscureText,
-            decoration: InputDecoration(
-              labelText: 'Passphrase',
-              hintText: 'At least 4 characters',
-              suffixIcon: IconButton(
-                icon: Icon(
-                    _obscureText ? Icons.visibility_off : Icons.visibility),
-                onPressed: () => setState(() => _obscureText = !_obscureText),
-              ),
-              errorText: _errorText.isNotEmpty ? _errorText : null,
-            ),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _confirmController,
-            obscureText: _obscureText,
-            decoration: const InputDecoration(
-              labelText: 'Confirm passphrase',
-            ),
-            onSubmitted: (_) => _onConfirm(),
-          ),
-        ],
-      ),
-      actions: <Widget>[
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: _onConfirm,
-          child: const Text('Create'),
-        ),
-      ],
-    );
-  }
-}
+// End of file

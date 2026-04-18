@@ -198,7 +198,7 @@ class SyncService {
             _eventDoc(uid, event.id);
         final Map<String, dynamic>? payload = await _eventCloudPayload(event);
         if (payload == null) {
-          _showSnackBar(messenger, 'Set a PIN to use encrypted cloud sync.');
+          _showSnackBar(messenger, 'Encryption key unavailable. Sync failed.');
           return;
         }
         batch.set(ref, payload, SetOptions(merge: true));
@@ -209,7 +209,7 @@ class SyncService {
             _habitDoc(uid, habit.id);
         final Map<String, dynamic>? payload = await _habitCloudPayload(habit);
         if (payload == null) {
-          _showSnackBar(messenger, 'Set a PIN to use encrypted cloud sync.');
+          _showSnackBar(messenger, 'Encryption key unavailable. Sync failed.');
           return;
         }
         batch.set(ref, payload, SetOptions(merge: true));
