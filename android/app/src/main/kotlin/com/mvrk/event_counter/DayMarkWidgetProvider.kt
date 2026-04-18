@@ -10,6 +10,7 @@ import android.graphics.Color
 import android.os.Bundle
 import android.view.View
 import android.widget.RemoteViews
+import com.mvrk.event_counter.R
 import es.antonborri.home_widget.HomeWidgetPlugin
 
 class EventCounterWidgetProvider : AppWidgetProvider() {

@@ -213,10 +213,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         _SettingsRow(
                           icon: Icons.sync_rounded,
                           iconColor: const Color(0xFF43A047),
-                          title: 'Sync to cloud',
+                          title: 'Cloud Synchronization',
                           subtitle: syncService.lastSyncedAt != null
                               ? 'Last: ${_formatDate(syncService.lastSyncedAt!)}'
-                              : 'Never synced',
+                              : 'Keep your data backed up and in sync',
                           trailing: FilledButton.tonal(
                             style: FilledButton.styleFrom(
                               visualDensity: VisualDensity.compact,
@@ -225,29 +225,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             onPressed: !isSignedIn
                                 ? null
                                 : () async {
-                                    await syncService.syncAll(messenger: ScaffoldMessenger.of(context));
+                                    await syncService.synchronize(messenger: ScaffoldMessenger.of(context));
                                   },
-                            child: const Text('Upload'),
-                          ),
-                        ),
-                        _SettingsDivider(),
-                        _SettingsRow(
-                          icon: Icons.cloud_download_outlined,
-                          iconColor: const Color(0xFF1E88E5),
-                          title: 'Restore from cloud',
-                          subtitle: 'Download your events & habits',
-                          trailing: FilledButton.tonal(
-                            style: FilledButton.styleFrom(
-                              visualDensity: VisualDensity.compact,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            ),
-                            onPressed: !isSignedIn
-                                ? null
-                                : () async {
-                                    final messenger = ScaffoldMessenger.of(context);
-                                    await syncService.restoreAll(messenger: messenger);
-                                  },
-                            child: const Text('Restore'),
+                            child: const Text('Sync Now'),
                           ),
                         ),
                       ],

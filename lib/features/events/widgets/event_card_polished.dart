@@ -156,6 +156,17 @@ class EventCardPolished extends StatelessWidget {
               ),
             ),
             _buildShareButton(context),
+            if (onAddToHomeScreen != null)
+              IconButton(
+                onPressed: onAddToHomeScreen,
+                icon: Icon(
+                  Icons.add_to_home_screen_rounded,
+                  size: 18,
+                  color: scheme.onSurface.withValues(alpha: 0.32),
+                ),
+                padding: const EdgeInsets.all(6),
+                constraints: const BoxConstraints(),
+              ),
             _buildMenuButton(context),
           ],
         ),

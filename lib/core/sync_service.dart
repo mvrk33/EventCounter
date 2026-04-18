@@ -178,6 +178,25 @@ class SyncService {
     return DateTime.tryParse(iso);
   }
 
+  Future<void> synchronize({ScaffoldMessengerState? messenger}) async {
+    if (!_canCloudSync()) {
+      _showSnackBar(messenger, 'Cloud sync unavailable in guest/offline mode.');
+      return;
+    }
+
+    try {
+      // 1. Pull changes from cloud (Restore)
+      // We pass null to messenger to avoid showing multiple snackbars
+      await restoreAll(messenger: null);
+
+      // 2. Push local changes to cloud (Sync)
+      await syncAll(messenger: messenger);
+    } catch (error) {
+      debugPrint('Full synchronization failed: $error');
+      _showSnackBar(messenger, 'Sync failed. Will retry when online.');
+    }
+  }
+
   Future<void> syncAll({ScaffoldMessengerState? messenger}) async {
     if (!_canCloudSync()) {
       _showSnackBar(messenger, 'Cloud sync unavailable in guest/offline mode.');

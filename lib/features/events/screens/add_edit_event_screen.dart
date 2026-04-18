@@ -115,6 +115,10 @@ class _AddEditEventScreenState extends ConsumerState<AddEditEventScreen> {
       _emoji = s.emoji;
       _color = s.primaryColor;
       _recurrence = s.suggestedRecurrence;
+      _countUnit = s.suggestedCountUnit;
+      if (s.suggestedDate != null) {
+        _date = s.suggestedDate!;
+      }
       if (s.suggestedReminderDays.isNotEmpty) {
         _reminderDays = List<int>.from(s.suggestedReminderDays);
       }
@@ -315,6 +319,21 @@ class _AddEditEventScreenState extends ConsumerState<AddEditEventScreen> {
         ? ' · ${s.suggestedRecurrence.label}'
         : '';
 
+    // Date hint text
+    String dateHint = '';
+    if (s.suggestedDate != null) {
+      final bool isToday = DateHelpers.sameDay(s.suggestedDate!, DateTime.now());
+      final bool isTomorrow = DateHelpers.sameDay(
+          s.suggestedDate!, DateTime.now().add(const Duration(days: 1)));
+      if (isToday) {
+        dateHint = ' · Today';
+      } else if (isTomorrow) {
+        dateHint = ' · Tomorrow';
+      } else {
+        dateHint = ' · ${DateFormat('MMM d').format(s.suggestedDate!)}';
+      }
+    }
+
     return Padding(
       padding: const EdgeInsets.only(top: 12),
       child: Semantics(
@@ -371,7 +390,7 @@ class _AddEditEventScreenState extends ConsumerState<AddEditEventScreen> {
                             ),
                           ),
                           Text(
-                            'Tap Apply to auto-fill$recurrenceHint',
+                            'Tap Apply to auto-fill$recurrenceHint$dateHint',
                             style: GoogleFonts.nunito(
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
@@ -572,6 +591,13 @@ class _AddEditEventScreenState extends ConsumerState<AddEditEventScreen> {
                 _PreviewPill(
                   icon: Icons.notifications_none_rounded,
                   label: _reminderLabel(s.suggestedReminderDays),
+                  accent: accent,
+                ),
+              if (s.suggestedDate != null) const SizedBox(width: 6),
+              if (s.suggestedDate != null)
+                _PreviewPill(
+                  icon: Icons.calendar_today_rounded,
+                  label: DateFormat('MMM d').format(s.suggestedDate!),
                   accent: accent,
                 ),
             ],

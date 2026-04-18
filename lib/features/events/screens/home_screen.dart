@@ -251,7 +251,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (insights.isEmpty) return const SizedBox.shrink();
 
     return Container(
-      height: 180,
+      height: 160,
       margin: const EdgeInsets.only(top: 8, bottom: 16),
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
@@ -268,18 +268,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               children: [
                 if (insight.backgroundEmoji != null)
                   Positioned(
-                    right: -20,
-                    bottom: -20,
+                    right: -10,
+                    bottom: -10,
                     child: Text(
                       insight.backgroundEmoji!,
                       style: TextStyle(
-                        fontSize: 100,
+                        fontSize: 80,
                         color: Colors.white.withValues(alpha: 0.1),
                       ),
                     ),
                   ),
                 Padding(
-                  padding: const EdgeInsets.all(20),
+                  padding: const EdgeInsets.all(16),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -1540,22 +1540,6 @@ class _EventWidgetConfigDialogState
                 ),
               ),
               const SizedBox(height: 24),
-              _buildConfigSection(
-                context,
-                'WIDGET SIZE',
-                Wrap(
-                  spacing: 8,
-                  children: <String>['2x2', '4x2', '4x4'].map((String size) {
-                    final bool selected = _selectedSize == size;
-                    return ChoiceChip(
-                      label: Text(size),
-                      selected: selected,
-                      onSelected: (_) => setState(() => _selectedSize = size),
-                    );
-                  }).toList(),
-                ),
-              ),
-              const SizedBox(height: 16),
               _buildConfigSection(
                 context,
                 'OPTIONS',

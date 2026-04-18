@@ -47,26 +47,48 @@ class SuggestionEngine {
     final List<int> reminders =
         top.reminderDays.toSet().toList(growable: false)..sort();
 
-    // ── Anniversary intelligence ─────────────────────────────────────────
-    // Any title that mentions "anniversary" (however the subject is tagged)
-    // is always a yearly, milestone-grade event counted in years.
-    final bool hasAnniversary = resolved.contains('anniversary');
+    // Anniversary / Birthday intelligence
+    final bool isLongTerm = resolved.contains('anniversary') ||
+        resolved.contains('birthday') ||
+        top.categoryId == 'Anniversary' ||
+        top.categoryId == 'Birthday';
+
     final EventRecurrence finalRecurrence =
-        hasAnniversary ? EventRecurrence.yearly : top.recurrence;
-    final List<int> finalReminders = hasAnniversary
+        isLongTerm ? EventRecurrence.yearly : top.recurrence;
+
+    final EventCountUnit finalCountUnit =
+        isLongTerm ? EventCountUnit.years : EventCountUnit.days;
+
+    final List<int> finalReminders = isLongTerm
         ? (<int>{0, 1, 7, ...reminders}.toList()..sort())
         : reminders;
-    if (hasAnniversary) {
-      secondary.add('Milestone');
-      if (top.categoryId != 'Anniversary') secondary.add('Anniversary');
-    }
-    secondary.remove(top.categoryId); // always keep primary out of secondary
 
-    // Emoji alternatives (all except primary)
+    if (isLongTerm) {
+      secondary.add('Milestone');
+      if (top.categoryId != 'Anniversary' && resolved.contains('anniversary')) {
+        secondary.add('Anniversary');
+      }
+    }
+    secondary.remove(top.categoryId);
+
+    // Emoji alternatives...
     final List<String> emojiAlts = EventEmojiBank.alternatives(top.categoryId)
         .where((String e) => e != top.emoji)
         .take(4)
         .toList(growable: false);
+
+    final DateTime? suggestedDate = _extractDate(resolved);
+    final String? cleanedTitle = _cleanTitle(t, suggestedDate != null);
+
+    // Predict mood/energy level
+    String? mood;
+    final String lowerTitle = t.toLowerCase();
+    if (RegExp(r'concert|party|gym|workout|run|dance|festival|sport').hasMatch(lowerTitle)) {
+      mood = 'High Energy';
+    } else if (RegExp(r'reading|meditation|sleep|nap|chill|relax|library|study').hasMatch(lowerTitle)) {
+      mood = 'Low Energy';
+    }
+
     return SuggestionResult(
       primaryCategory: top.categoryId,
       secondaryLabels: secondary.toList(growable: false),
@@ -75,12 +97,108 @@ class SuggestionEngine {
       primaryColor: top.primaryColor,
       bgColor: top.bgColor,
       suggestedRecurrence: finalRecurrence,
+      suggestedCountUnit: finalCountUnit,
       suggestedReminderDays: finalReminders,
+      suggestedDate: suggestedDate,
+      suggestedMood: mood,
+      cleanedTitle: cleanedTitle,
       confidence: topScore,
       isAmbiguous: isAmbiguous,
       disambiguationOptions: disambig,
     );
   }
+
+  /// Strips temporal metadata from the title if a date was extracted.
+  static String? _cleanTitle(String title, bool dateExtracted) {
+    if (!dateExtracted) return null;
+
+    String cleaned = title;
+    final List<String> patterns = [
+      r'today',
+      r'tomorrow',
+      r'at \d+(am|pm|:\d+)',
+      r'in \d+ days?',
+      r'in \d+ weeks?',
+      r'in \d+ months?',
+      r'next (monday|tuesday|wednesday|thursday|friday|saturday|sunday)',
+      r'this (monday|tuesday|wednesday|thursday|friday|saturday|sunday)',
+      r'\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b',
+    ];
+
+    for (final pattern in patterns) {
+      cleaned = cleaned.replaceAll(RegExp(pattern, caseSensitive: false), '');
+    }
+
+    // Clean up extra spaces
+    cleaned = cleaned.replaceAll(RegExp(r'\s+'), ' ').trim();
+
+    return cleaned.isEmpty ? null : cleaned;
+  }
+
+  static DateTime? _extractDate(String text) {
+    final DateTime now = DateTime.now();
+    final DateTime today = DateTime(now.year, now.month, now.day);
+
+    // "today"
+    if (text.contains('today')) return today;
+
+    // "tomorrow"
+    if (text.contains('tomorrow')) return today.add(const Duration(days: 1));
+
+    // "in X days"
+    final RegExp inDaysRegex = RegExp(r'in (\d+) days?');
+    final Match? daysMatch = inDaysRegex.firstMatch(text);
+    if (daysMatch != null) {
+      final int days = int.tryParse(daysMatch.group(1)!) ?? 0;
+      return today.add(Duration(days: days));
+    }
+
+    // "in X weeks"
+    final RegExp inWeeksRegex = RegExp(r'in (\d+) weeks?');
+    final Match? weeksMatch = inWeeksRegex.firstMatch(text);
+    if (weeksMatch != null) {
+      final int weeks = int.tryParse(weeksMatch.group(1)!) ?? 0;
+      return today.add(Duration(days: weeks * 7));
+    }
+
+    // "in X months"
+    final RegExp inMonthsRegex = RegExp(r'in (\d+) months?');
+    final Match? monthsMatch = inMonthsRegex.firstMatch(text);
+    if (monthsMatch != null) {
+      final int months = int.tryParse(monthsMatch.group(1)!) ?? 0;
+      return DateTime(today.year, today.month + months, today.day);
+    }
+
+    // Days of week: "next monday", "this friday", etc.
+    final Map<String, int> weekDays = {
+      'monday': DateTime.monday,
+      'tuesday': DateTime.tuesday,
+      'wednesday': DateTime.wednesday,
+      'thursday': DateTime.thursday,
+      'friday': DateTime.friday,
+      'saturday': DateTime.saturday,
+      'sunday': DateTime.sunday,
+    };
+
+    for (final dayEntry in weekDays.entries) {
+      if (text.contains('next ${dayEntry.key}')) {
+        int daysUntil = dayEntry.value - today.weekday;
+        if (daysUntil <= 0) daysUntil += 7;
+        return today.add(Duration(days: daysUntil));
+      }
+      if (text.contains('this ${dayEntry.key}') ||
+          (text.contains(dayEntry.key) &&
+              !text.contains('last') &&
+              !text.contains('next'))) {
+        int daysUntil = dayEntry.value - today.weekday;
+        if (daysUntil < 0) daysUntil += 7;
+        return today.add(Duration(days: daysUntil));
+      }
+    }
+
+    return null;
+  }
+
   // ── Private helpers ────────────────────────────────────────────────────
   static String _resolveAliases(String input) {
     String out = input;
