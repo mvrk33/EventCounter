@@ -250,127 +250,148 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final bool isToday = DateHelpers.sameDay(nextDate, today);
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
       child: GestureDetector(
         onTap: () => _showEventDetail(context, event),
         child: Container(
-          padding: const EdgeInsets.all(16),
+          height: 110,
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: <Color>[
-                accent.withValues(alpha: 0.18),
-                accent.withValues(alpha: 0.07),
-              ],
-            ),
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(
-              color: accent.withValues(alpha: 0.22),
-              width: 1,
-            ),
-          ),
-          child: Row(
-            children: <Widget>[
-              // Left: label + event info
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Row(
-                      children: <Widget>[
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: accent.withValues(alpha: 0.20),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: <Widget>[
-                              Icon(Icons.bolt_rounded, size: 12, color: accent),
-                              const SizedBox(width: 3),
-                              Text(
-                                'NEXT UP',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w800,
-                                  color: accent,
-                                  letterSpacing: 0.8,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: <Widget>[
-                        Text(event.emoji, style: const TextStyle(fontSize: 22)),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            event.title,
-                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: -0.3,
-                                ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      isToday
-                          ? '🎉 Today!'
-                          : DateFormat('EEE, MMM d').format(event.nextOccurrenceDate),
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: scheme.onSurface.withValues(alpha: 0.60),
-                          ),
-                    ),
-                  ],
-                ),
-              ),
-              // Right: large countdown
-              Container(
-                width: 72,
-                height: 72,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: accent.withValues(alpha: isToday ? 0.25 : 0.12),
-                  border: Border.all(
-                    color: accent.withValues(alpha: isToday ? 0.55 : 0.30),
-                    width: 2,
-                  ),
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: <Widget>[
-                    Text(
-                      isToday ? '🎊' : '$daysUntil',
-                      style: TextStyle(
-                        fontSize: isToday ? 30 : 26,
-                        fontWeight: FontWeight.w900,
-                        color: accent,
-                        height: 1.0,
-                      ),
-                    ),
-                    if (!isToday)
-                      Text(
-                        'days',
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: accent.withValues(alpha: 0.75),
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                  ],
-                ),
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: accent.withValues(alpha: 0.15),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
               ),
             ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(24),
+            child: Stack(
+              children: [
+                // Background Gradient
+                Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          accent.withValues(alpha: 0.15),
+                          accent.withValues(alpha: 0.05),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                // Glass effect pattern
+                Positioned(
+                  right: -20,
+                  top: -20,
+                  child: Container(
+                    width: 100,
+                    height: 100,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white.withValues(alpha: 0.05),
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: <Widget>[
+                      // Left: Emoji and Info
+                      Container(
+                        width: 56,
+                        height: 56,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.8),
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.05),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Center(
+                          child: Text(event.emoji, style: const TextStyle(fontSize: 28)),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: <Widget>[
+                            Row(
+                              children: [
+                                Icon(Icons.auto_awesome_rounded, size: 12, color: accent),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'NEXT UP',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w900,
+                                    color: accent,
+                                    letterSpacing: 1.2,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              event.title,
+                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: -0.5,
+                                  ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            Text(
+                              isToday
+                                  ? 'Happening today! 🎊'
+                                  : DateFormat('EEEE, MMM d').format(event.nextOccurrenceDate),
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: scheme.onSurface.withValues(alpha: 0.6),
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      // Right: Days
+                      Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            isToday ? '0' : '$daysUntil',
+                            style: TextStyle(
+                              fontSize: 32,
+                              fontWeight: FontWeight.w900,
+                              color: accent,
+                              height: 1.0,
+                            ),
+                          ),
+                          Text(
+                            'days',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: accent.withValues(alpha: 0.6),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -383,171 +404,101 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final hour = DateTime.now().hour;
 
     final String greeting;
-    final String greetingEmoji;
     if (hour < 5) {
       greeting = 'Late night';
-      greetingEmoji = '🌙';
     } else if (hour < 12) {
       greeting = 'Good morning';
-      greetingEmoji = '☀️';
     } else if (hour < 17) {
       greeting = 'Good afternoon';
-      greetingEmoji = '🌤️';
     } else {
       greeting = 'Good evening';
-      greetingEmoji = '🌆';
     }
 
     final String dayStr = DateFormat('EEEE').format(DateTime.now());
-    final String dateStr = DateFormat('MMMM d, y').format(DateTime.now());
+    final String dateStr = DateFormat('MMMM d').format(DateTime.now());
 
     // Pick gradient based on time of day
     final List<Color> gradientColors;
     if (isDark) {
-      gradientColors = [const Color(0xFF1A1D3A), const Color(0xFF2E2060)];
+      gradientColors = [const Color(0xFF1E1E1E), const Color(0xFF2C2C2C)];
     } else if (hour < 5) {
-      gradientColors = [const Color(0xFF1A1A3E), const Color(0xFF2D1B5E)];
+      gradientColors = [const Color(0xFF0F2027), const Color(0xFF203A43), const Color(0xFF2C5364)];
     } else if (hour < 12) {
-      gradientColors = [const Color(0xFF3B5BDB), const Color(0xFF845EF7)];
+      gradientColors = [const Color(0xFF48c6ef), const Color(0xFF6f86d6)];
     } else if (hour < 17) {
-      gradientColors = [const Color(0xFF1971C2), const Color(0xFF0CA678)];
+      gradientColors = [const Color(0xFF00b09b), const Color(0xFF96c93d)];
     } else {
-      gradientColors = [const Color(0xFF862E9C), const Color(0xFFE67700)];
+      gradientColors = [const Color(0xFFf857a6), const Color(0xFFff5858)];
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        // ── Hero banner ───────────────────────────────────────────────────
-        Container(
-          margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: gradientColors,
+    return Container(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    dayStr,
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w900,
+                      fontSize: 32,
+                      letterSpacing: -1.0,
+                    ),
+                  ),
+                  Text(
+                    dateStr,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+              CircleAvatar(
+                radius: 24,
+                backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                child: Icon(
+                  hour < 5 ? Icons.nightlight_round : hour < 17 ? Icons.wb_sunny_rounded : Icons.wb_twilight_rounded,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _StatCard(
+                  title: 'This Week',
+                  value: '$thisWeekCount',
+                  icon: Icons.calendar_today_rounded,
+                  color: Colors.blue,
+                ),
+                const SizedBox(width: 12),
+                _StatCard(
+                  title: 'Habits',
+                  value: '$habitCount',
+                  icon: Icons.local_fire_department_rounded,
+                  color: Colors.orange,
+                ),
+                const SizedBox(width: 12),
+                _StatCard(
+                  title: 'Total',
+                  value: '${ref.watch(eventsProvider).length}',
+                  icon: Icons.all_inclusive_rounded,
+                  color: Colors.purple,
+                ),
+              ],
             ),
-            borderRadius: BorderRadius.circular(28),
-            boxShadow: <BoxShadow>[
-              BoxShadow(
-                color: gradientColors.last.withValues(alpha: isDark ? 0.35 : 0.28),
-                blurRadius: 32,
-                offset: const Offset(0, 12),
-              ),
-            ],
           ),
-          child: Stack(
-            children: <Widget>[
-              // Decorative blobs
-              Positioned(
-                right: -30,
-                top: -30,
-                child: Container(
-                  width: 140,
-                  height: 140,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.white.withValues(alpha: 0.05),
-                  ),
-                ),
-              ),
-              Positioned(
-                left: -20,
-                bottom: -30,
-                child: Container(
-                  width: 100,
-                  height: 100,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.white.withValues(alpha: 0.04),
-                  ),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(22, 20, 22, 20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    // Date row
-                    Row(
-                      children: <Widget>[
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: <Widget>[
-                              const Icon(Icons.calendar_today_rounded,
-                                  size: 11, color: Colors.white),
-                              const SizedBox(width: 5),
-                              Text(
-                                dayStr.toUpperCase(),
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.white,
-                                  letterSpacing: 1.1,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const Spacer(),
-                        Text(
-                          dateStr,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.white.withValues(alpha: 0.60),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    // Greeting
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        Expanded(
-                          child: Text(
-                            '$greeting $greetingEmoji',
-                            style: const TextStyle(
-                              fontSize: 28,
-                              fontWeight: FontWeight.w800,
-                              color: Colors.white,
-                              letterSpacing: -0.6,
-                              height: 1.1,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 18),
-                    // Stat pills row
-                    Row(
-                      children: <Widget>[
-                        _HeroPill(
-                          icon: Icons.event_rounded,
-                          label: '$thisWeekCount this week',
-                        ),
-                        const SizedBox(width: 10),
-                        _HeroPill(
-                          icon: Icons.local_fire_department_rounded,
-                          label: '$habitCount habits',
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 8),
-      ],
+        ],
+      ),
     );
   }
 
@@ -1103,6 +1054,57 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
+class _StatCard extends StatelessWidget {
+  const _StatCard({
+    required this.title,
+    required this.value,
+    required this.icon,
+    required this.color,
+  });
+
+  final String title;
+  final String value;
+  final IconData icon;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 120,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withValues(alpha: 0.1), width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: color, size: 20),
+          const SizedBox(height: 12),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.w900,
+              color: color,
+            ),
+          ),
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: color.withValues(alpha: 0.7),
+              letterSpacing: 0.2,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// Compact pill badge used inside the hero gradient banner.
 class _HeroPill extends StatelessWidget {
   const _HeroPill({
@@ -1240,168 +1242,253 @@ class _EventWidgetConfigDialogState
     final scheme = Theme.of(context).colorScheme;
     final int value = DateHelpers.eventCountValue(widget.event);
 
-    return AlertDialog(
-      title: const Text('Configure Event Widget'),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Text(
-              'For: ${widget.event.title}',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: scheme.onSurface.withValues(alpha: 0.6),
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.all(20),
+      child: Container(
+        decoration: BoxDecoration(
+          color: scheme.surface,
+          borderRadius: BorderRadius.circular(28),
+        ),
+        padding: const EdgeInsets.all(24),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Row(
+                children: [
+                  Text(
+                    'Widget Preview',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
-            ),
-            const SizedBox(height: 16),
-            // Live preview
-            Center(
-              child: Container(
-                width: 140,
-                height: 140,
-                decoration: BoxDecoration(
-                  color: _transparent
-                      ? scheme.surfaceContainerHighest.withValues(alpha: 0.5)
-                      : _bgColor,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: <BoxShadow>[
-                    BoxShadow(
-                      color: (_transparent ? Colors.black : _bgColor)
-                          .withValues(alpha: 0.25),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: <Widget>[
-                    if (_showEmoji)
-                      Text(
-                        widget.event.emoji,
-                        style: const TextStyle(fontSize: 32),
-                      ),
-                    Text(
-                      '$value',
-                      style: TextStyle(
-                        fontSize: 32,
-                        fontWeight: FontWeight.w900,
-                        color: _transparent ? scheme.onSurface : _textColor,
-                        height: 1.0,
-                      ),
-                    ),
-                    Text(
-                      _countUnit,
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: (_transparent ? scheme.onSurface : _textColor)
-                            .withValues(alpha: 0.75),
-                      ),
-                    ),
-                    if (_showTitle)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 4),
-                        child: Text(
-                          widget.event.title,
-                          style: TextStyle(
-                            fontSize: 10,
-                            color:
-                                (_transparent ? scheme.onSurface : _textColor)
-                                    .withValues(alpha: 0.65),
+                  const Spacer(),
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              // Live preview - styled like a real widget
+              Center(
+                child: Container(
+                  width: 150,
+                  height: 150,
+                  decoration: BoxDecoration(
+                    color: _transparent
+                        ? scheme.surfaceContainerHighest.withValues(alpha: 0.3)
+                        : _bgColor,
+                    borderRadius: BorderRadius.circular(28),
+                    boxShadow: <BoxShadow>[
+                      if (!_transparent)
+                        BoxShadow(
+                          color: _bgColor.withValues(alpha: 0.3),
+                          blurRadius: 20,
+                          offset: const Offset(0, 8),
+                        ),
+                    ],
+                  ),
+                  child: Stack(
+                    children: [
+                      Positioned(
+                        right: -15,
+                        top: -15,
+                        child: Container(
+                          width: 70,
+                          height: 70,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.white.withValues(alpha: 0.1),
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          textAlign: TextAlign.center,
                         ),
                       ),
+                      Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: <Widget>[
+                            if (_showEmoji)
+                              Text(
+                                widget.event.emoji,
+                                style: const TextStyle(fontSize: 36),
+                              ),
+                            Text(
+                              '$value',
+                              style: TextStyle(
+                                fontSize: 36,
+                                fontWeight: FontWeight.w900,
+                                color: _transparent ? scheme.onSurface : _textColor,
+                                height: 1.0,
+                              ),
+                            ),
+                            Text(
+                              _countUnit,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: (_transparent ? scheme.onSurface : _textColor)
+                                    .withValues(alpha: 0.7),
+                              ),
+                            ),
+                            if (_showTitle)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 8),
+                                child: Text(
+                                  widget.event.title,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: (_transparent ? scheme.onSurface : _textColor)
+                                        .withValues(alpha: 0.8),
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              _buildConfigSection(
+                context,
+                'WIDGET SIZE',
+                Wrap(
+                  spacing: 8,
+                  children: <String>['2x2', '4x2', '4x4'].map((String size) {
+                    final bool selected = _selectedSize == size;
+                    return ChoiceChip(
+                      label: Text(size),
+                      selected: selected,
+                      onSelected: (_) => setState(() => _selectedSize = size),
+                    );
+                  }).toList(),
+                ),
+              ),
+              const SizedBox(height: 16),
+              _buildConfigSection(
+                context,
+                'OPTIONS',
+                Column(
+                  children: [
+                    _ConfigToggle(
+                      label: 'Show emoji',
+                      value: _showEmoji,
+                      onChanged: (v) => setState(() => _showEmoji = v),
+                    ),
+                    _ConfigToggle(
+                      label: 'Show event name',
+                      value: _showTitle,
+                      onChanged: (v) => setState(() => _showTitle = v),
+                    ),
+                    _ConfigToggle(
+                      label: 'Transparent background',
+                      value: _transparent,
+                      onChanged: (v) => setState(() => _transparent = v),
+                    ),
                   ],
                 ),
               ),
-            ),
-            const SizedBox(height: 20),
-            // Widget size selection
-            Text(
-              'Widget Size',
-              style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                    color: scheme.primary,
-                    fontWeight: FontWeight.w700,
+              const SizedBox(height: 16),
+              _buildConfigSection(
+                context,
+                'COUNT UNIT',
+                Wrap(
+                  spacing: 8,
+                  children: <String>['days', 'months', 'years'].map((String u) {
+                    final bool selected = _countUnit == u;
+                    return ChoiceChip(
+                      label: Text(u[0].toUpperCase() + u.substring(1)),
+                      selected: selected,
+                      onSelected: (_) => setState(() => _countUnit = u),
+                    );
+                  }).toList(),
+                ),
+              ),
+              const SizedBox(height: 32),
+              SizedBox(
+                width: double.infinity,
+                height: 54,
+                child: FilledButton.icon(
+                  onPressed: _pinEventWidget,
+                  style: FilledButton.styleFrom(
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
                   ),
-            ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              children: <String>['2x2', '4x2', '4x4'].map((String size) {
-                final bool selected = _selectedSize == size;
-                return ChoiceChip(
-                  label: Text(size),
-                  selected: selected,
-                  onSelected: (_) => setState(() => _selectedSize = size),
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: 16),
-            // Display options
-            Text(
-              'Display Options',
-              style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                    color: scheme.primary,
-                    fontWeight: FontWeight.w700,
+                  icon: const Icon(Icons.add_to_home_screen_rounded),
+                  label: const Text(
+                    'Add Widget',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
                   ),
-            ),
-            const SizedBox(height: 8),
-            CheckboxListTile(
-              title: const Text('Show emoji'),
-              value: _showEmoji,
-              onChanged: (bool? v) => setState(() => _showEmoji = v ?? true),
-              dense: true,
-            ),
-            CheckboxListTile(
-              title: const Text('Show event name'),
-              value: _showTitle,
-              onChanged: (bool? v) => setState(() => _showTitle = v ?? true),
-              dense: true,
-            ),
-            CheckboxListTile(
-              title: const Text('Transparent background'),
-              value: _transparent,
-              onChanged: (bool? v) => setState(() => _transparent = v ?? false),
-              dense: true,
-            ),
-            const SizedBox(height: 12),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildConfigSection(BuildContext context, String title, Widget child) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w900,
+            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
+            letterSpacing: 1.2,
+          ),
+        ),
+        const SizedBox(height: 8),
+        child,
+      ],
+    );
+  }
+}
+
+class _ConfigToggle extends StatelessWidget {
+  const _ConfigToggle({
+    required this.label,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final String label;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: () => onChanged(!value),
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
+        child: Row(
+          children: [
             Text(
-              'Count Unit',
-              style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                    color: scheme.primary,
-                    fontWeight: FontWeight.w700,
-                  ),
+              label,
+              style: const TextStyle(fontWeight: FontWeight.w500),
             ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              children: <String>['days', 'months', 'years'].map((String u) {
-                final bool selected = _countUnit == u;
-                return ChoiceChip(
-                  label: Text(u[0].toUpperCase() + u.substring(1)),
-                  selected: selected,
-                  onSelected: (_) => setState(() => _countUnit = u),
-                );
-              }).toList(),
+            const Spacer(),
+            Switch(
+              value: value,
+              onChanged: onChanged,
             ),
           ],
         ),
       ),
-      actions: <Widget>[
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        FilledButton.icon(
-          onPressed: _pinEventWidget,
-          icon: const Icon(Icons.add_to_home_screen_rounded),
-          label: const Text('Add Widget'),
-        ),
-      ],
     );
   }
 }

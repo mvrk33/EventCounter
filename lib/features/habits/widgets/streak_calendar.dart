@@ -70,23 +70,23 @@ class StreakCalendar extends StatelessWidget {
                 final bool isToday = DateHelpers.sameDay(day, today);
                 return AnimatedContainer(
                   duration: const Duration(milliseconds: 220),
-                  width: 28,
-                  height: 28,
+                  width: 32,
+                  height: 32,
                   decoration: BoxDecoration(
                     color: checked
                         ? color
                         : isToday
-                            ? color.withValues(alpha: 0.12)
-                            : scheme.surfaceContainerHighest.withValues(alpha: 0.6),
-                    borderRadius: BorderRadius.circular(8),
+                            ? color.withValues(alpha: 0.1)
+                            : scheme.surfaceContainerHighest.withValues(alpha: 0.4),
+                    borderRadius: BorderRadius.circular(10),
                     border: isToday
-                        ? Border.all(color: color.withValues(alpha: 0.5), width: 1.5)
+                        ? Border.all(color: color.withValues(alpha: 0.4), width: 1.5)
                         : null,
                   ),
                   child: checked
                       ? const Icon(
                           Icons.check_rounded,
-                          size: 14,
+                          size: 16,
                           color: Colors.white,
                         )
                       : isToday
@@ -94,8 +94,8 @@ class StreakCalendar extends StatelessWidget {
                               child: Text(
                                 '${day.day}',
                                 style: TextStyle(
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w700,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
                                   color: color,
                                 ),
                               ),

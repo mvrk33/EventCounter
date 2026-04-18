@@ -71,13 +71,45 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final bool isSignedIn = user != null;
 
     return CustomScrollView(
+      physics: const BouncingScrollPhysics(),
       slivers: <Widget>[
         // ── Header ────────────────────────────────────────────────────
         SliverToBoxAdapter(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
-            child: Text('Settings ⚙️',
-                style: Theme.of(context).textTheme.headlineMedium),
+            padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Settings',
+                        style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: -1,
+                            ),
+                      ),
+                      Text(
+                        'Preferences & account management',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: scheme.onSurface.withValues(alpha: 0.5),
+                              fontWeight: FontWeight.w500,
+                            ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: scheme.primaryContainer.withValues(alpha: 0.4),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(Icons.settings_outlined, color: scheme.primary, size: 24),
+                ),
+              ],
+            ),
           ),
         ),
         SliverToBoxAdapter(
@@ -87,20 +119,38 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[
                 // ── Profile card ───────────────────────────────────────
-                _SettingsGroup(
-                  children: <Widget>[
-                    InkWell(
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                            builder: (_) => const AccountScreen()),
-                      ),
-                      borderRadius: BorderRadius.circular(16),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Row(
-                          children: <Widget>[
-                            CircleAvatar(
-                              radius: 26,
+                Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(24),
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        scheme.primary.withValues(alpha: 0.1),
+                        scheme.primary.withValues(alpha: 0.02),
+                      ],
+                    ),
+                    border: Border.all(
+                      color: scheme.primary.withValues(alpha: 0.1),
+                    ),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: InkWell(
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(builder: (_) => const AccountScreen()),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Row(
+                        children: <Widget>[
+                          Container(
+                            padding: const EdgeInsets.all(3),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(color: scheme.primary.withValues(alpha: 0.2)),
+                            ),
+                            child: CircleAvatar(
+                              radius: 30,
                               backgroundColor: scheme.primaryContainer,
                               backgroundImage: user?.photoURL != null &&
                                       user!.photoURL!.isNotEmpty
@@ -113,54 +163,51 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                           ? user!.displayName![0].toUpperCase()
                                           : '👤',
                                       style: TextStyle(
-                                        fontSize:
-                                            user?.displayName?.isNotEmpty ==
-                                                    true
-                                                ? 22
-                                                : 24,
+                                        fontSize: user?.displayName?.isNotEmpty == true ? 24 : 26,
+                                        fontWeight: FontWeight.bold,
                                         color: scheme.onPrimaryContainer,
                                       ),
                                     )
                                   : null,
                             ),
-                            const SizedBox(width: 14),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: <Widget>[
-                                  Text(
-                                    user?.displayName ?? 'Guest',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .titleMedium
-                                        ?.copyWith(
-                                          color: scheme.onSurface,
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                  ),
-                                  Text(
-                                    isSignedIn
-                                        ? user.email ?? 'Signed in'
-                                        : 'Not signed in — data is local',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodySmall
-                                        ?.copyWith(
-                                          color: scheme.onSurface
-                                              .withValues(alpha: 0.68),
-                                        ),
-                                  ),
-                                ],
-                              ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: <Widget>[
+                                Text(
+                                  user?.displayName ?? 'Guest User',
+                                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                        color: scheme.onSurface,
+                                        fontWeight: FontWeight.w800,
+                                        letterSpacing: -0.5,
+                                      ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  isSignedIn ? user.email ?? 'Signed in' : 'Local only — tap to sign in',
+                                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                        color: scheme.onSurface.withValues(alpha: 0.5),
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                ),
+                              ],
                             ),
-                            Icon(Icons.chevron_right_rounded,
-                                color:
-                                    scheme.onSurface.withValues(alpha: 0.35)),
-                          ],
-                        ),
+                          ),
+                          Icon(Icons.arrow_forward_ios_rounded,
+                              size: 16, color: scheme.onSurface.withValues(alpha: 0.3)),
+                        ],
                       ),
                     ),
-                    _SettingsDivider(),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                
+                const _SectionHeader(label: 'CLOUD SYNC'),
+                const SizedBox(height: 12),
+                _SettingsGroup(
+                  children: <Widget>[
                     _SettingsRow(
                       icon: Icons.sync_rounded,
                       iconColor: const Color(0xFF43A047),
@@ -169,11 +216,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           ? 'Last: ${_formatDate(syncService.lastSyncedAt!)}'
                           : 'Never synced',
                       trailing: FilledButton.tonal(
+                        style: FilledButton.styleFrom(
+                          visualDensity: VisualDensity.compact,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
                         onPressed: !isSignedIn
                             ? null
                             : () async {
-                                await syncService.syncAll(
-                                    messenger: ScaffoldMessenger.of(context));
+                                await syncService.syncAll(messenger: ScaffoldMessenger.of(context));
                               },
                         child: const Text('Upload'),
                       ),
@@ -183,24 +233,27 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       icon: Icons.cloud_download_outlined,
                       iconColor: const Color(0xFF1E88E5),
                       title: 'Restore from cloud',
-                      subtitle: 'Download your events & habits from backup',
+                      subtitle: 'Download your events & habits',
                       trailing: FilledButton.tonal(
+                        style: FilledButton.styleFrom(
+                          visualDensity: VisualDensity.compact,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
                         onPressed: !isSignedIn
                             ? null
                             : () async {
                                 final messenger = ScaffoldMessenger.of(context);
-                                await syncService.restoreAll(
-                                    messenger: messenger);
+                                await syncService.restoreAll(messenger: messenger);
                               },
                         child: const Text('Restore'),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 20),
-                // ...existing code...
+                const SizedBox(height: 24),
+
                 const _SectionHeader(label: 'APPEARANCE'),
-                const SizedBox(height: 8),
+                const SizedBox(height: 12),
                 _SettingsGroup(
                   children: <Widget>[
                     Padding(
@@ -213,15 +266,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           ),
                           const SizedBox(width: 12),
                           Expanded(
-                            child: Text('Theme',
-                                style: Theme.of(context).textTheme.titleSmall),
+                            child: Text(
+                              'Theme Mode',
+                              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                            ),
                           ),
-                          const SizedBox(width: 8),
                           SegmentedButton<ThemeMode>(
                             selected: <ThemeMode>{mode},
                             onSelectionChanged: (Set<ThemeMode> value) {
-                              ref.read(themeModeProvider.notifier).state =
-                                  value.first;
+                              ref.read(themeModeProvider.notifier).state = value.first;
                             },
                             segments: const <ButtonSegment<ThemeMode>>[
                               ButtonSegment<ThemeMode>(
@@ -230,17 +285,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               ),
                               ButtonSegment<ThemeMode>(
                                 value: ThemeMode.system,
-                                icon: Icon(Icons.brightness_auto_rounded,
-                                    size: 16),
+                                icon: Icon(Icons.brightness_auto_rounded, size: 16),
                               ),
                               ButtonSegment<ThemeMode>(
                                 value: ThemeMode.dark,
                                 icon: Icon(Icons.dark_mode_rounded, size: 16),
                               ),
                             ],
+                            showSelectedIcon: false,
                             style: SegmentedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 10, vertical: 8),
+                              visualDensity: VisualDensity.compact,
+                              padding: const EdgeInsets.symmetric(horizontal: 4),
                             ),
                           ),
                         ],
@@ -248,22 +303,26 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 20),
-                const _SectionHeader(label: 'DATA'),
-                const SizedBox(height: 8),
+                const SizedBox(height: 24),
+
+                const _SectionHeader(label: 'DATA MANAGEMENT'),
+                const SizedBox(height: 12),
                 _SettingsGroup(
                   children: <Widget>[
                     _SettingsRow(
                       icon: Icons.upload_file_rounded,
                       iconColor: const Color(0xFF1E88E5),
                       title: 'Export as JSON',
-                      subtitle: '${events.length} events',
+                      subtitle: '${events.length} events found',
                       trailing: OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          visualDensity: VisualDensity.compact,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
                         onPressed: events.isEmpty
                             ? null
                             : () async {
-                                final file =
-                                    await _exportService.exportEventsJson(
+                                final file = await _exportService.exportEventsJson(
                                   events,
                                   security: pinSecurity,
                                 );
@@ -278,13 +337,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       icon: Icons.table_chart_rounded,
                       iconColor: const Color(0xFF00897B),
                       title: 'Export as CSV',
-                      subtitle: 'Spreadsheet-compatible',
+                      subtitle: 'For spreadsheets',
                       trailing: OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          visualDensity: VisualDensity.compact,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
                         onPressed: events.isEmpty
                             ? null
                             : () async {
-                                final file = await _exportService
-                                    .exportEventsCsv(events);
+                                final file = await _exportService.exportEventsCsv(events);
                                 if (!mounted) return;
                                 _showExportOptions(context, file);
                               },
@@ -295,32 +357,30 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     _SettingsRow(
                       icon: Icons.download_rounded,
                       iconColor: const Color(0xFFE53935),
-                      title: 'Import backup file',
-                      subtitle: 'Auto-detects JSON, encrypted JSON, and CSV',
+                      title: 'Import backup',
+                      subtitle: 'JSON or CSV files',
                       trailing: OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          visualDensity: VisualDensity.compact,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
                         onPressed: () async {
-                          final ScaffoldMessengerState messenger =
-                              ScaffoldMessenger.of(context);
-                          final imported =
-                              await _exportService.importEventsJsonFromPicker(
+                          final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+                          final imported = await _exportService.importEventsJsonFromPicker(
                             security: pinSecurity,
                           );
                           if (imported.isEmpty) {
                             messenger.showSnackBar(
                               const SnackBar(
                                   content: Text(
-                                      'No backup selected, unsupported format, or encrypted with a different key.')),
+                                      'No backup selected or unsupported format.')),
                             );
                             return;
                           }
-                          await ref
-                              .read(eventsProvider.notifier)
-                              .importEvents(imported);
+                          await ref.read(eventsProvider.notifier).importEvents(imported);
                           if (!mounted) return;
                           messenger.showSnackBar(
-                            SnackBar(
-                                content: Text(
-                                    'Imported ${imported.length} events.')),
+                            SnackBar(content: Text('Imported ${imported.length} events.')),
                           );
                         },
                         child: const Text('Import'),
@@ -328,50 +388,47 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 24),
+
                 const _SectionHeader(label: 'SECURITY'),
-                const SizedBox(height: 8),
+                const SizedBox(height: 12),
                 _SettingsGroup(
                   children: <Widget>[
                     _SettingsRow(
                       icon: Icons.lock_rounded,
                       iconColor: const Color(0xFF5E35B1),
-                      title: 'Encrypt data',
-                      subtitle: 'AES-256 encryption is always on for local and cloud backups',
-                      trailing: const Icon(Icons.check_circle_rounded,
-                          color: Color(0xFF43A047)),
+                      title: 'Data Encryption',
+                      subtitle: 'AES-256 always active',
+                      trailing: Icon(Icons.verified_user_rounded,
+                          color: Colors.green.withValues(alpha: 0.8), size: 20),
                     ),
                     _SettingsDivider(),
                     _SettingsRow(
                       icon: Icons.fingerprint_rounded,
                       iconColor: const Color(0xFF1565C0),
-                      title: 'App lock',
-                      subtitle:
-                          'Require fingerprint, face ID, or device PIN to open the app',
-                      trailing: Switch(
-                        value: pinSecurity.isAppLockEnabled,
-                        onChanged: (bool value) => _setAppLock(value),
+                      title: 'Biometric Lock',
+                      subtitle: 'Protect access to your logs',
+                      trailing: Transform.scale(
+                        scale: 0.8,
+                        child: Switch(
+                          value: pinSecurity.isAppLockEnabled,
+                          onChanged: (bool value) => _setAppLock(value),
+                        ),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 24),
+
                 const _SectionHeader(label: 'ABOUT'),
-                const SizedBox(height: 8),
+                const SizedBox(height: 12),
                 _SettingsGroup(
                   children: <Widget>[
                     _SettingsRow(
                       icon: Icons.info_outline_rounded,
                       iconColor: scheme.primary,
                       title: 'Version',
-                      subtitle: 'Event Counter v1.0.0',
-                    ),
-                    _SettingsDivider(),
-                    const _SettingsRow(
-                      icon: Icons.balance_rounded,
-                      iconColor: Color(0xFF8E24AA),
-                      title: 'License',
-                      subtitle: 'MIT License',
+                      subtitle: 'DayMark v1.1.0-gold',
                     ),
                     _SettingsDivider(),
                     InkWell(
@@ -379,11 +436,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       child: _SettingsRow(
                         icon: Icons.code_rounded,
                         iconColor: const Color(0xFF37474F),
-                        title: 'Open source',
+                        title: 'Open Source',
                         subtitle: 'View on GitHub',
-                        trailing: Icon(Icons.open_in_new_rounded,
-                            size: 16,
-                            color: scheme.onSurface.withValues(alpha: 0.4)),
+                        trailing: Icon(Icons.arrow_outward_rounded,
+                            size: 14, color: scheme.onSurface.withValues(alpha: 0.3)),
                       ),
                     ),
                     _SettingsDivider(),
@@ -391,24 +447,24 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       onTap: _handleDeveloperTap,
                       onLongPress: _openGithub,
                       child: _SettingsRow(
-                        icon: Icons.person_rounded,
-                        iconColor: const Color(0xFF6D4C41),
+                        icon: Icons.auto_awesome_rounded,
+                        iconColor: Colors.amber,
                         title: 'Developer',
-                        subtitle: 'venkata rajesh murala',
-                        trailing: Icon(Icons.celebration_rounded,
-                            size: 16,
-                            color: scheme.onSurface.withValues(alpha: 0.4)),
+                        subtitle: 'Venkata Rajesh Murala',
+                        trailing: Icon(Icons.favorite_rounded,
+                            size: 14, color: Colors.red.withValues(alpha: 0.4)),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 32),
+                const SizedBox(height: 48),
               ],
             ),
           ),
         ),
       ],
     );
+
   }
 
   String _formatDate(DateTime dt) {

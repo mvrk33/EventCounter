@@ -38,57 +38,35 @@ class EventCardPolished extends StatelessWidget {
     final bool comfortable = density == EventCardDensity.comfortable;
 
     return Container(
-      margin: EdgeInsets.symmetric(horizontal: 16, vertical: comfortable ? 7 : 4),
+      margin: EdgeInsets.symmetric(horizontal: 16, vertical: comfortable ? 8 : 5),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(24),
         color: scheme.surface,
         boxShadow: <BoxShadow>[
           BoxShadow(
-            color: accent.withValues(alpha: 0.08),
-            blurRadius: 20,
-            offset: const Offset(0, 6),
-          ),
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 15,
+            offset: const Offset(0, 5),
           ),
         ],
+        border: Border.all(
+          color: accent.withValues(alpha: 0.1),
+          width: 1,
+        ),
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(24),
         child: Material(
           color: Colors.transparent,
           child: InkWell(
             onTap: onTap,
-            splashColor: accent.withValues(alpha: 0.07),
-            highlightColor: accent.withValues(alpha: 0.03),
-            child: Stack(
-              children: <Widget>[
-                // ── Left accent bar (full-height via Positioned) ──────────
-                Positioned(
-                  left: 0,
-                  top: 0,
-                  bottom: 0,
-                  width: 4,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: <Color>[accent, accent.withValues(alpha: 0.45)],
-                      ),
-                    ),
-                  ),
-                ),
-                // ── Main content (inset so it clears the accent bar) ──────
-                Padding(
-                  padding: EdgeInsets.fromLTRB(18, comfortable ? 16 : 12, 6, comfortable ? 14 : 12),
-                  child: comfortable
-                      ? _buildComfortableLayout(context, accent, value, compactDescription, fullDescription)
-                      : _buildCompactLayout(context, accent, value, compactDescription, scheme),
-                ),
-              ],
+            splashColor: accent.withValues(alpha: 0.05),
+            highlightColor: accent.withValues(alpha: 0.02),
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(16, comfortable ? 16 : 12, 8, comfortable ? 14 : 12),
+              child: comfortable
+                  ? _buildComfortableLayout(context, accent, value, compactDescription, fullDescription)
+                  : _buildCompactLayout(context, accent, value, compactDescription, scheme),
             ),
           ),
         ),

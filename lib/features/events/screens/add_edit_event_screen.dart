@@ -137,66 +137,103 @@ class _AddEditEventScreenState extends ConsumerState<AddEditEventScreen> {
     final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(editing ? 'Edit Event' : 'New Event'),
-        leading: IconButton(
-          icon: const Icon(Icons.close_rounded),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-      ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 140),
-        children: <Widget>[
-          // ── Title field with smart suggestion ──────────────────────────
-          _buildTitleField(context, scheme),
-          // ── Smart suggestion banner ────────────────────────────────────
-          AnimatedSize(
-            duration: const Duration(milliseconds: 260),
-            curve: Curves.easeInOut,
-            child: _pendingSuggestion != null
-                ? _buildSuggestionBanner(context, scheme)
-                : const SizedBox.shrink(),
+      body: CustomScrollView(
+        slivers: [
+          SliverAppBar.large(
+            title: Text(
+              editing ? 'Edit Event' : 'New Event',
+              style: GoogleFonts.nunito(fontWeight: FontWeight.w900),
+            ),
+            leading: IconButton(
+              icon: const Icon(Icons.close_rounded),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            centerTitle: false,
+            backgroundColor: scheme.surface,
+            surfaceTintColor: Colors.transparent,
+            stretch: true,
           ),
-          const SizedBox(height: 16),
-          // ── Date ───────────────────────────────────────────────────────
-          _buildDateTile(context, scheme),
-          const SizedBox(height: 16),
-          // ── Count unit ─────────────────────────────────────────────
-          _buildCountUnitSection(context, scheme),
-          const SizedBox(height: 16),
-          // ── Recurrence ─────────────────────────────────────────────
-          _buildRecurrenceSection(context, scheme),
-          const SizedBox(height: 16),
-          // ── Reminders ──────────────────────────────────────────────
-          _buildRemindersSection(context, scheme),
-          const SizedBox(height: 16),
-          // ── Notes ──────────────────────────────────────────────────
-          _buildNotesField(context, scheme),
-          const SizedBox(height: 16),
-          // ── Advanced section ───────────────────────────────────────────
-          _buildAdvancedSection(context, scheme),
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 140),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate([
+                // ── Title field with smart suggestion ──────────────────────────
+                _buildTitleField(context, scheme),
+                // ── Smart suggestion banner ────────────────────────────────────
+                AnimatedSize(
+                  duration: const Duration(milliseconds: 260),
+                  curve: Curves.easeInOut,
+                  child: _pendingSuggestion != null
+                      ? _buildSuggestionBanner(context, scheme)
+                      : const SizedBox.shrink(),
+                ),
+                const SizedBox(height: 16),
+                // ── Date ───────────────────────────────────────────────────────
+                _buildDateTile(context, scheme),
+                const SizedBox(height: 24),
+                // ── Count unit ─────────────────────────────────────────────
+                _buildCountUnitSection(context, scheme),
+                const SizedBox(height: 24),
+                // ── Recurrence ─────────────────────────────────────────────
+                _buildRecurrenceSection(context, scheme),
+                const SizedBox(height: 24),
+                // ── Reminders ──────────────────────────────────────────────
+                _buildRemindersSection(context, scheme),
+                const SizedBox(height: 24),
+                // ── Notes ──────────────────────────────────────────────────
+                _buildNotesField(context, scheme),
+                const SizedBox(height: 24),
+                // ── Advanced section ───────────────────────────────────────────
+                _buildAdvancedSection(context, scheme),
+              ]),
+            ),
+          ),
         ],
       ),
       // ── Sticky save bar ────────────────────────────────────────────────
       bottomNavigationBar: Container(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
         decoration: BoxDecoration(
-          color: scheme.surface,
-          boxShadow: <BoxShadow>[
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.07),
-              blurRadius: 16,
-              offset: const Offset(0, -4),
-            ),
-          ],
+          color: scheme.surface.withValues(alpha: 0.8),
+          border: Border(
+            top: BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.3)),
+          ),
         ),
         child: SafeArea(
-          child: SizedBox(
-            width: double.infinity,
-            child: FilledButton.icon(
+          child: Container(
+            decoration: BoxDecoration(
+              boxShadow: [
+                BoxShadow(
+                  color: scheme.primary.withValues(alpha: 0.2),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: FilledButton(
               onPressed: _save,
-              icon: Icon(editing ? Icons.check_rounded : Icons.add_rounded),
-              label: Text(editing ? 'Update Event' : 'Create Event'),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(double.infinity, 56),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                backgroundColor: scheme.primary,
+                foregroundColor: scheme.onPrimary,
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(editing ? Icons.check_rounded : Icons.add_rounded),
+                  const SizedBox(width: 10),
+                  Text(
+                    editing ? 'Update Event' : 'Create Event',
+                    style: GoogleFonts.nunito(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -208,33 +245,49 @@ class _AddEditEventScreenState extends ConsumerState<AddEditEventScreen> {
 
   Widget _buildTitleField(BuildContext context, ColorScheme scheme) {
     return _FormCard(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
       child: TextField(
         controller: _titleController,
         autofocus: widget.existing == null,
         textCapitalization: TextCapitalization.sentences,
-        style: GoogleFonts.nunito(fontSize: 18, fontWeight: FontWeight.w700),
+        style: GoogleFonts.nunito(fontSize: 20, fontWeight: FontWeight.w800),
         decoration: InputDecoration(
           hintText: 'Event name…',
+          hintStyle: GoogleFonts.nunito(
+            fontWeight: FontWeight.w600,
+            color: scheme.onSurface.withValues(alpha: 0.3),
+          ),
           border: InputBorder.none,
           enabledBorder: InputBorder.none,
           focusedBorder: InputBorder.none,
           filled: false,
           prefixIcon: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            width: 48,
-            height: 48,
-            margin: const EdgeInsets.all(6),
+            duration: const Duration(milliseconds: 300),
+            width: 56,
+            height: 56,
+            margin: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: Color(_color).withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(12),
+              gradient: LinearGradient(
+                colors: [
+                  Color(_color).withValues(alpha: 0.25),
+                  Color(_color).withValues(alpha: 0.1),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: Color(_color).withValues(alpha: 0.3),
+                width: 1.5,
+              ),
             ),
             child: Center(
-              child: Text(_emoji, style: const TextStyle(fontSize: 22)),
+              child: Text(_emoji, style: const TextStyle(fontSize: 28)),
             ),
           ),
           suffixIcon: _titleController.text.isNotEmpty
               ? IconButton(
-                  icon: const Icon(Icons.clear_rounded, size: 18),
+                  icon: const Icon(Icons.clear_rounded, size: 20),
                   onPressed: () {
                     _titleController.clear();
                     setState(() => _pendingSuggestion = null);
@@ -249,7 +302,6 @@ class _AddEditEventScreenState extends ConsumerState<AddEditEventScreen> {
   Widget _buildSuggestionBanner(BuildContext context, ColorScheme scheme) {
     final SuggestionResult s = _pendingSuggestion!;
     final Color accent = Color(s.primaryColor);
-    final Color bg = Color(s.bgColor).withValues(alpha: 0.12);
 
     // Confidence-based label
     final String confidenceLabel = s.confidence >= 0.80
@@ -264,7 +316,7 @@ class _AddEditEventScreenState extends ConsumerState<AddEditEventScreen> {
         : '';
 
     return Padding(
-      padding: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.only(top: 12),
       child: Semantics(
         label:
             'Smart suggestion: ${s.primaryCategory}. Tap Apply to use, or dismiss.',
@@ -272,11 +324,16 @@ class _AddEditEventScreenState extends ConsumerState<AddEditEventScreen> {
           onTap: () => setState(() => _bannerExpanded = !_bannerExpanded),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 220),
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: bg,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: accent.withValues(alpha: 0.35)),
+              gradient: LinearGradient(
+                colors: [
+                  accent.withValues(alpha: 0.15),
+                  accent.withValues(alpha: 0.05),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: accent.withValues(alpha: 0.3)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -284,15 +341,23 @@ class _AddEditEventScreenState extends ConsumerState<AddEditEventScreen> {
                 // ── Compact row ─────────────────────────────────────────
                 Row(
                   children: <Widget>[
-                    AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 200),
-                      child: Text(
-                        s.emoji,
-                        key: ValueKey<String>(s.emoji),
-                        style: const TextStyle(fontSize: 22),
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 300),
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.5),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 200),
+                        child: Text(
+                          s.emoji,
+                          key: ValueKey<String>(s.emoji),
+                          style: const TextStyle(fontSize: 24),
+                        ),
                       ),
                     ),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 14),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -300,48 +365,50 @@ class _AddEditEventScreenState extends ConsumerState<AddEditEventScreen> {
                           Text(
                             confidenceLabel,
                             style: GoogleFonts.nunito(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w900,
                               color: accent,
                             ),
                           ),
                           Text(
                             'Tap Apply to auto-fill$recurrenceHint',
                             style: GoogleFonts.nunito(
-                              fontSize: 11,
-                              color: accent.withValues(alpha: 0.75),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: accent.withValues(alpha: 0.7),
                             ),
                           ),
                         ],
                       ),
                     ),
                     const SizedBox(width: 6),
-                    // Apply button — minimum 64×36 dp touch target
+                    // Apply button
                     SizedBox(
-                      height: 36,
+                      height: 40,
                       child: FilledButton(
                         onPressed: _acceptSuggestion,
                         style: FilledButton.styleFrom(
                           backgroundColor: accent,
-                          minimumSize: const Size(64, 36),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 14, vertical: 0),
-                          textStyle: GoogleFonts.nunito(
-                              fontSize: 12, fontWeight: FontWeight.w700),
+                              horizontal: 16, vertical: 0),
                         ),
-                        child: const Text('Apply'),
+                        child: Text(
+                          'Apply',
+                          style: GoogleFonts.nunito(
+                              fontSize: 13, fontWeight: FontWeight.w800),
+                        ),
                       ),
                     ),
-                    // Dismiss — 44×44 dp touch target via padding
-                    Padding(
-                      padding: const EdgeInsets.all(8),
-                      child: GestureDetector(
-                        onTap: _dismissSuggestion,
-                        child: Icon(
-                          Icons.close_rounded,
-                          size: 16,
-                          color: accent.withValues(alpha: 0.55),
-                        ),
+                    // Dismiss
+                    IconButton(
+                      onPressed: _dismissSuggestion,
+                      icon: Icon(
+                        Icons.close_rounded,
+                        size: 20,
+                        color: accent.withValues(alpha: 0.4),
                       ),
                     ),
                   ],
@@ -546,62 +613,89 @@ class _AddEditEventScreenState extends ConsumerState<AddEditEventScreen> {
 
     return InkWell(
       onTap: _pickDate,
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(28),
       child: _FormCard(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(18),
         child: Row(
           children: <Widget>[
             Container(
-              width: 52,
-              height: 52,
+              width: 60,
+              height: 60,
               decoration: BoxDecoration(
-                color: scheme.primary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(14),
+                gradient: LinearGradient(
+                  colors: [
+                    scheme.primary.withValues(alpha: 0.15),
+                    scheme.primary.withValues(alpha: 0.05),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: scheme.primary.withValues(alpha: 0.1),
+                  width: 1,
+                ),
               ),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: <Widget>[
                   Text(
                     '${_date.day}',
-                    style: TextStyle(
-                      fontSize: 20,
+                    style: GoogleFonts.nunito(
+                      fontSize: 22,
                       fontWeight: FontWeight.w900,
                       color: scheme.primary,
-                      height: 1,
+                      height: 1.1,
                     ),
                   ),
                   Text(
                     DateFormat('MMM').format(_date).toUpperCase(),
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
+                    style: GoogleFonts.nunito(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
                       color: scheme.primary,
+                      letterSpacing: 0.5,
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(width: 14),
+            const SizedBox(width: 16),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
                   Text(
                     label,
-                    style: Theme.of(context).textTheme.titleMedium,
+                    style: GoogleFonts.nunito(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: scheme.onSurface,
+                    ),
                   ),
+                  const SizedBox(height: 2),
                   Text(
                     preview,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: scheme.onSurface.withValues(alpha: 0.5),
-                        ),
+                    style: GoogleFonts.nunito(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: scheme.onSurface.withValues(alpha: 0.5),
+                    ),
                   ),
                 ],
               ),
             ),
-            Icon(
-              Icons.edit_calendar_rounded,
-              color: scheme.primary.withValues(alpha: 0.7),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: scheme.primary.withValues(alpha: 0.08),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.edit_calendar_rounded,
+                size: 20,
+                color: scheme.primary,
+              ),
             ),
           ],
         ),
@@ -614,49 +708,57 @@ class _AddEditEventScreenState extends ConsumerState<AddEditEventScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         const _SectionLabel(icon: Icons.timer_outlined, label: 'Count unit'),
-        const SizedBox(height: 8),
-        _FormCard(
-          child: Row(
-            children: EventCountUnit.values.map((EventCountUnit unit) {
-              final bool selected = _countUnit == unit;
-              final String name =
-                  unit.name[0].toUpperCase() + unit.name.substring(1);
-              return Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: GestureDetector(
-                    onTap: () => setState(() => _countUnit = unit),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 160),
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                      decoration: BoxDecoration(
+        const SizedBox(height: 12),
+        Row(
+          children: EventCountUnit.values.map((EventCountUnit unit) {
+            final bool selected = _countUnit == unit;
+            final String name =
+                unit.name[0].toUpperCase() + unit.name.substring(1);
+            return Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: GestureDetector(
+                  onTap: () => setState(() => _countUnit = unit),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    decoration: BoxDecoration(
+                      color: selected
+                          ? scheme.primary
+                          : scheme.surface,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
                         color: selected
-                            ? scheme.primaryContainer
-                            : scheme.surfaceContainerHighest,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color:
-                              selected ? scheme.primary : scheme.outlineVariant,
-                          width: 1.5,
-                        ),
+                            ? scheme.primary
+                            : scheme.outlineVariant.withValues(alpha: 0.4),
+                        width: 1.5,
                       ),
-                      child: Text(
-                        name,
-                        textAlign: TextAlign.center,
-                        style: GoogleFonts.nunito(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: selected
-                              ? scheme.onPrimaryContainer
-                              : scheme.onSurface.withValues(alpha: 0.7),
-                        ),
+                      boxShadow: selected
+                          ? [
+                              BoxShadow(
+                                color: scheme.primary.withValues(alpha: 0.25),
+                                blurRadius: 12,
+                                offset: const Offset(0, 4),
+                              )
+                            ]
+                          : null,
+                    ),
+                    child: Text(
+                      name,
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.nunito(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        color: selected
+                            ? scheme.onPrimary
+                            : scheme.onSurface.withValues(alpha: 0.7),
                       ),
                     ),
                   ),
                 ),
-              );
-            }).toList(growable: false),
-          ),
+              ),
+            );
+          }).toList(growable: false),
         ),
       ],
     );
@@ -667,28 +769,29 @@ class _AddEditEventScreenState extends ConsumerState<AddEditEventScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         const _SectionLabel(icon: Icons.repeat_rounded, label: 'Repeat'),
-        const SizedBox(height: 8),
+        const SizedBox(height: 12),
         _FormCard(
+          padding: const EdgeInsets.all(12),
           child: Row(
             children: EventRecurrence.values.map((EventRecurrence r) {
               final bool selected = _recurrence == r;
               return Expanded(
                 child: Padding(
-                  padding: const EdgeInsets.only(right: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
                   child: GestureDetector(
                     onTap: () => setState(() => _recurrence = r),
                     child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 160),
-                      padding: const EdgeInsets.symmetric(vertical: 9),
+                      duration: const Duration(milliseconds: 200),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
                       decoration: BoxDecoration(
                         color: selected
-                            ? scheme.primaryContainer
-                            : scheme.surfaceContainerHighest,
-                        borderRadius: BorderRadius.circular(10),
+                            ? scheme.primary.withValues(alpha: 0.1)
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(16),
                         border: Border.all(
                           color: selected
                               ? scheme.primary
-                              : scheme.outlineVariant,
+                              : Colors.transparent,
                           width: 1.5,
                         ),
                       ),
@@ -697,9 +800,9 @@ class _AddEditEventScreenState extends ConsumerState<AddEditEventScreen> {
                         children: <Widget>[
                           Text(
                             r.emoji,
-                            style: const TextStyle(fontSize: 14),
+                            style: const TextStyle(fontSize: 18),
                           ),
-                          const SizedBox(height: 2),
+                          const SizedBox(height: 4),
                           Text(
                             r == EventRecurrence.once
                                 ? 'Once'
@@ -710,11 +813,11 @@ class _AddEditEventScreenState extends ConsumerState<AddEditEventScreen> {
                                         : 'Yearly',
                             textAlign: TextAlign.center,
                             style: GoogleFonts.nunito(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
                               color: selected
-                                  ? scheme.onPrimaryContainer
-                                  : scheme.onSurface.withValues(alpha: 0.65),
+                                  ? scheme.primary
+                                  : scheme.onSurface.withValues(alpha: 0.6),
                             ),
                           ),
                         ],
@@ -743,15 +846,16 @@ class _AddEditEventScreenState extends ConsumerState<AddEditEventScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         const _SectionLabel(icon: Icons.notifications_outlined, label: 'Reminders'),
-        const SizedBox(height: 8),
+        const SizedBox(height: 12),
         _FormCard(
+          padding: const EdgeInsets.all(18),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
               // ── Reminder day chips ────────────────────────────────────
               Wrap(
-                spacing: 8,
-                runSpacing: 8,
+                spacing: 10,
+                runSpacing: 10,
                 children: <Widget>[
                   ...allChips.map((int d) {
                     final bool sel = _reminderDays.contains(d);
@@ -760,18 +864,6 @@ class _AddEditEventScreenState extends ConsumerState<AddEditEventScreen> {
                           ? 'On event day'
                           : '$d day${d > 1 ? 's' : ''} before'),
                       selected: sel,
-                      selectedColor: scheme.primaryContainer,
-                      checkmarkColor: scheme.primary,
-                      backgroundColor: scheme.surfaceContainerHighest,
-                      side: BorderSide(
-                        color: sel ? scheme.primary : scheme.outlineVariant,
-                        width: 1.2,
-                      ),
-                      labelStyle: TextStyle(
-                        color: sel ? scheme.onPrimaryContainer : scheme.onSurface,
-                        fontWeight: sel ? FontWeight.w700 : FontWeight.w500,
-                        fontSize: 13,
-                      ),
                       onSelected: (bool v) => setState(() {
                         if (v) {
                           _reminderDays.add(d);
@@ -779,19 +871,29 @@ class _AddEditEventScreenState extends ConsumerState<AddEditEventScreen> {
                           _reminderDays.remove(d);
                         }
                       }),
+                      selectedColor: scheme.primary.withValues(alpha: 0.15),
+                      checkmarkColor: scheme.primary,
+                      backgroundColor: scheme.surfaceContainerLow,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: BorderSide(
+                          color: sel ? scheme.primary : scheme.outlineVariant.withValues(alpha: 0.3),
+                          width: 1.5,
+                        ),
+                      ),
+                      labelStyle: GoogleFonts.nunito(
+                        color: sel ? scheme.primary : scheme.onSurface.withValues(alpha: 0.8),
+                        fontWeight: sel ? FontWeight.w800 : FontWeight.w600,
+                        fontSize: 13,
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
                     );
                   }),
                   // ── + Custom chip ────────────────────────────────────
                   ActionChip(
                     avatar: Icon(Icons.add_rounded,
-                        size: 16, color: scheme.primary),
+                        size: 18, color: scheme.primary),
                     label: const Text('Custom'),
-                    backgroundColor: scheme.surfaceContainerHighest,
-                    side: BorderSide(color: scheme.outlineVariant, width: 1.2),
-                    labelStyle: TextStyle(
-                        color: scheme.primary,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13),
                     onPressed: () async {
                       final int? days = await _showCustomDayDialog(context);
                       if (days != null && days > 0) {
@@ -802,38 +904,62 @@ class _AddEditEventScreenState extends ConsumerState<AddEditEventScreen> {
                         });
                       }
                     },
+                    backgroundColor: scheme.surfaceContainerLow,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.3), width: 1.5),
+                    ),
+                    labelStyle: GoogleFonts.nunito(
+                        color: scheme.primary,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13),
                   ),
                 ],
               ),
-              const Divider(height: 24),
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 20),
+                child: Divider(height: 1, thickness: 1),
+              ),
               // ── Live notification toggle ──────────────────────────────
               Row(
                 children: <Widget>[
                   Container(
-                    width: 32,
-                    height: 32,
+                    width: 44,
+                    height: 44,
                     decoration: BoxDecoration(
-                      color: Colors.amber.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(8),
+                      gradient: const LinearGradient(
+                        colors: [Colors.amber, Color(0xFFFFC107)],
+                      ),
+                      borderRadius: BorderRadius.circular(14),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.amber.withValues(alpha: 0.3),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
                     ),
                     child: const Icon(Icons.show_chart_rounded,
-                        color: Colors.amber, size: 18),
+                        color: Colors.white, size: 24),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 16),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
-                        Text('Live progress notification',
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleSmall
-                                ?.copyWith(fontWeight: FontWeight.w600)),
+                        Text('Live Progress',
+                            style: GoogleFonts.nunito(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              color: scheme.onSurface,
+                            )),
                         Text(
-                          'Show a persistent countdown with progress bar in your notification shade',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: scheme.onSurface.withValues(alpha: 0.55),
-                              ),
+                          'Show countdown in notification shade',
+                          style: GoogleFonts.nunito(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: scheme.onSurface.withValues(alpha: 0.5),
+                          ),
                         ),
                       ],
                     ),
@@ -920,20 +1046,30 @@ class _AddEditEventScreenState extends ConsumerState<AddEditEventScreen> {
 
   Widget _buildNotesField(BuildContext context, ColorScheme scheme) {
     return _FormCard(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: TextField(
         controller: _notesController,
         textCapitalization: TextCapitalization.sentences,
         minLines: 2,
         maxLines: 5,
-        decoration: const InputDecoration(
+        style: GoogleFonts.nunito(
+          fontSize: 16,
+          fontWeight: FontWeight.w600,
+          color: scheme.onSurface,
+        ),
+        decoration: InputDecoration(
           hintText: 'Add notes (optional)…',
+          hintStyle: GoogleFonts.nunito(
+            fontWeight: FontWeight.w600,
+            color: scheme.onSurface.withValues(alpha: 0.3),
+          ),
           border: InputBorder.none,
           enabledBorder: InputBorder.none,
           focusedBorder: InputBorder.none,
           filled: false,
           prefixIcon: Padding(
-            padding: EdgeInsets.only(bottom: 32),
-            child: Icon(Icons.notes_rounded, size: 20),
+            padding: const EdgeInsets.only(bottom: 40),
+            child: Icon(Icons.notes_rounded, size: 22, color: scheme.primary.withValues(alpha: 0.6)),
           ),
           alignLabelWithHint: true,
         ),
@@ -947,26 +1083,35 @@ class _AddEditEventScreenState extends ConsumerState<AddEditEventScreen> {
         // Expand/collapse button
         InkWell(
           onTap: () => setState(() => _advancedOpen = !_advancedOpen),
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(20),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
             decoration: BoxDecoration(
-              color: scheme.surfaceContainerLow,
-              borderRadius: BorderRadius.circular(14),
+              color: scheme.surface,
+              borderRadius: BorderRadius.circular(20),
               border: Border.all(
-                  color: scheme.outlineVariant.withValues(alpha: 0.5)),
+                  color: scheme.outlineVariant.withValues(alpha: 0.4),
+                  width: 1.5),
             ),
             child: Row(
               children: <Widget>[
-                Icon(Icons.tune_rounded, size: 16, color: scheme.primary),
-                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: scheme.primary.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(Icons.tune_rounded, size: 18, color: scheme.primary),
+                ),
+                const SizedBox(width: 14),
                 Expanded(
                   child: Text(
                     'Advanced options',
-                    style: Theme.of(context)
-                        .textTheme
-                        .labelLarge
-                        ?.copyWith(color: scheme.primary),
+                    style: GoogleFonts.nunito(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: scheme.primary,
+                    ),
                   ),
                 ),
                 Icon(
@@ -1001,76 +1146,80 @@ class _AddEditEventScreenState extends ConsumerState<AddEditEventScreen> {
       children: <Widget>[
         // Category
         const _SectionLabel(icon: Icons.label_outline_rounded, label: 'Category'),
-        const SizedBox(height: 8),
+        const SizedBox(height: 12),
         _FormCard(
+          padding: const EdgeInsets.all(16),
           child: Wrap(
-            spacing: 8,
-            runSpacing: 8,
+            spacing: 10,
+            runSpacing: 10,
             children: AppConstants.predefinedCategories.map((String c) {
               final bool selected = _category == c;
               return ChoiceChip(
                 label: Text(c),
                 selected: selected,
+                onSelected: (_) {
+                  setState(() {
+                    _category = c;
+                    _userHasCustomised = true;
+                    _pendingSuggestion = null;
+                    // Apply emoji defaults from the emoji bank for this category
+                    _emoji = _categoryDefaultEmoji(c);
+                  });
+                },
                 selectedColor: scheme.primary,
-                backgroundColor: scheme.surfaceContainerHighest,
-                labelStyle: TextStyle(
-                  color: selected ? Colors.white : scheme.onSurface,
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                backgroundColor: scheme.surfaceContainerLow,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: BorderSide(
+                    color: selected ? scheme.primary : scheme.outlineVariant.withValues(alpha: 0.3),
+                    width: 1.5,
+                  ),
+                ),
+                labelStyle: GoogleFonts.nunito(
+                  color: selected ? Colors.white : scheme.onSurface.withValues(alpha: 0.8),
+                  fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
                   fontSize: 13,
                 ),
-                side: BorderSide(
-                  color: selected ? scheme.primary : scheme.outlineVariant,
-                  width: 1.2,
-                ),
-                 onSelected: (_) {
-                   setState(() {
-                     _category = c;
-                     _userHasCustomised = true;
-                     _pendingSuggestion = null;
-                     // Apply emoji defaults from the emoji bank for this category
-                     _emoji = _categoryDefaultEmoji(c);
-                   });
-                 },
               );
             }).toList(growable: false),
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 24),
         // Emoji
         const _SectionLabel(icon: Icons.emoji_emotions_outlined, label: 'Emoji'),
-        const SizedBox(height: 8),
+        const SizedBox(height: 12),
         _FormCard(
+          padding: const EdgeInsets.all(16),
           child: Column(
             children: <Widget>[
               // Emoji quick-picker row
               SizedBox(
-                height: 48,
+                height: 56,
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
                   itemCount: _emojiRow.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 6),
+                  separatorBuilder: (_, __) => const SizedBox(width: 10),
                   itemBuilder: (BuildContext ctx, int i) {
                     final String e = _emojiRow[i];
                     final bool selected = _emoji == e;
                     return GestureDetector(
                       onTap: () => setState(() => _emoji = e),
                       child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 150),
-                        width: 48,
-                        height: 48,
+                        duration: const Duration(milliseconds: 200),
+                        width: 56,
+                        height: 56,
                         decoration: BoxDecoration(
                           color: selected
-                              ? Color(_color).withValues(alpha: 0.2)
-                              : scheme.surfaceContainerHighest
-                                  .withValues(alpha: 0.6),
-                          borderRadius: BorderRadius.circular(12),
-                          border: selected
-                              ? Border.all(color: Color(_color), width: 2)
-                              : Border.all(
-                                  color: scheme.outlineVariant, width: 1),
+                              ? Color(_color).withValues(alpha: 0.15)
+                              : scheme.surfaceContainerLow,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: selected ? Color(_color) : scheme.outlineVariant.withValues(alpha: 0.3),
+                            width: 2,
+                          ),
                         ),
                         child: Center(
-                          child: Text(e, style: const TextStyle(fontSize: 22)),
+                          child: Text(e, style: const TextStyle(fontSize: 26)),
                         ),
                       ),
                     );
@@ -1080,38 +1229,59 @@ class _AddEditEventScreenState extends ConsumerState<AddEditEventScreen> {
             ],
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 24),
         // Colour
         const _SectionLabel(icon: Icons.palette_outlined, label: 'Colour'),
-        const SizedBox(height: 8),
+        const SizedBox(height: 12),
         _FormCard(
-          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           child: Row(
             children: <Widget>[
               Container(
-                width: 44,
-                height: 44,
+                width: 48,
+                height: 48,
                 decoration: BoxDecoration(
-                  color: Color(_color),
+                  gradient: LinearGradient(
+                    colors: [
+                      Color(_color),
+                      Color(_color).withValues(alpha: 0.7),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
                   shape: BoxShape.circle,
                   boxShadow: <BoxShadow>[
                     BoxShadow(
-                        color: Color(_color).withValues(alpha: 0.4),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2)),
+                        color: Color(_color).withValues(alpha: 0.3),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4)),
                   ],
+                  border: Border.all(color: Colors.white, width: 2),
                 ),
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: 16),
               Expanded(
                 child: Text(
-                  'Event colour',
-                  style: Theme.of(context).textTheme.titleSmall,
+                  'Event Colour',
+                  style: GoogleFonts.nunito(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: scheme.onSurface,
+                  ),
                 ),
               ),
               FilledButton.tonal(
                 onPressed: _pickColor,
-                child: const Text('Change'),
+                style: FilledButton.styleFrom(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+                ),
+                child: Text(
+                  'Change',
+                  style: GoogleFonts.nunito(fontWeight: FontWeight.w800),
+                ),
               ),
             ],
           ),
@@ -1250,18 +1420,19 @@ class _SectionLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return Padding(
-      padding: const EdgeInsets.only(left: 2),
+      padding: const EdgeInsets.only(left: 4),
       child: Row(
         children: <Widget>[
-          Icon(icon, size: 14, color: scheme.primary.withValues(alpha: 0.8)),
-          const SizedBox(width: 6),
+          Icon(icon, size: 16, color: scheme.primary.withValues(alpha: 0.7)),
+          const SizedBox(width: 8),
           Text(
             label.toUpperCase(),
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: scheme.primary.withValues(alpha: 0.8),
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.8,
-                ),
+            style: GoogleFonts.nunito(
+              fontSize: 12,
+              fontWeight: FontWeight.w900,
+              color: scheme.primary.withValues(alpha: 0.7),
+              letterSpacing: 1.2,
+            ),
           ),
         ],
       ),
@@ -1280,20 +1451,20 @@ class _FormCard extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: scheme.surface,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(24),
         border: Border.all(
-          color: scheme.outlineVariant.withValues(alpha: 0.35),
-          width: 1,
+          color: scheme.outlineVariant.withValues(alpha: 0.4),
+          width: 1.5,
         ),
         boxShadow: <BoxShadow>[
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
-      padding: padding ?? const EdgeInsets.all(14),
+      padding: padding ?? const EdgeInsets.all(20),
       child: child,
     );
   }

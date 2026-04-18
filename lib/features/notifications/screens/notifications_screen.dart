@@ -58,17 +58,21 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen>
         // ── Header ────────────────────────────────────────────────────
         SliverToBoxAdapter(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+            padding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Text('Alerts 🔔',
-                    style: Theme.of(context).textTheme.headlineMedium),
+                Text('Alerts',
+                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -1.0,
+                    )),
                 const SizedBox(height: 4),
                 Text(
                   'Manage your reminders & permissions.',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: scheme.onSurface.withValues(alpha: 0.55),
+                        color: scheme.onSurface.withValues(alpha: 0.5),
+                        fontWeight: FontWeight.w600,
                       ),
                 ),
               ],
@@ -111,10 +115,16 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen>
                                     }
                                     await _refreshPermissionStatus();
                                   },
+                                  style: FilledButton.styleFrom(
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
                                   child: Text(
                                     _permissionStatus.isPermanentlyDenied
                                         ? 'Settings'
                                         : 'Allow',
+                                    style: const TextStyle(fontWeight: FontWeight.w700),
                                   ),
                                 ),
                     ),
@@ -158,7 +168,12 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen>
                                 }
                               }
                             : null,
-                        child: const Text('Schedule'),
+                        style: OutlinedButton.styleFrom(
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text('Schedule', style: TextStyle(fontWeight: FontWeight.w700)),
                       ),
                     ),
                   ],
@@ -202,7 +217,12 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen>
                                 );
                               }
                             : null,
-                        child: const Text('Change'),
+                        style: OutlinedButton.styleFrom(
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text('Change', style: TextStyle(fontWeight: FontWeight.w700)),
                       ),
                     ),
                   ],
@@ -210,24 +230,26 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen>
                 const SizedBox(height: 20),
                 // ── Info box ──────────────────────────────────────────
                 Container(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: scheme.primaryContainer.withValues(alpha: 0.4),
-                    borderRadius: BorderRadius.circular(16),
+                    color: scheme.primaryContainer.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: scheme.primary.withValues(alpha: 0.1)),
                   ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
                       Icon(Icons.info_outline_rounded,
-                          color: scheme.primary, size: 18),
-                      const SizedBox(width: 10),
+                          color: scheme.primary, size: 20),
+                      const SizedBox(width: 14),
                       Expanded(
                         child: Text(
                           'Event reminders are also configured individually when you create or edit an event.',
                           style:
                               Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: scheme.primary,
-                                    fontWeight: FontWeight.w500,
+                                    color: scheme.onPrimaryContainer,
+                                    fontWeight: FontWeight.w600,
+                                    height: 1.4,
                                   ),
                         ),
                       ),
@@ -253,15 +275,20 @@ class _NotifGroup extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       decoration: BoxDecoration(
         color: scheme.surface,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: scheme.outlineVariant.withValues(alpha: isDark ? 0.2 : 0.5),
+          width: 1,
+        ),
         boxShadow: <BoxShadow>[
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
+            blurRadius: 15,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -289,25 +316,32 @@ class _NotifRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
       child: Row(
         children: <Widget>[
           Container(
-            width: 34,
-            height: 34,
+            width: 44,
+            height: 44,
             decoration: BoxDecoration(
-              color: iconColor.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(10),
+              color: iconColor.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(14),
             ),
-            child: Icon(icon, color: iconColor, size: 18),
+            child: Icon(icon, color: iconColor, size: 22),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Text(title, style: Theme.of(context).textTheme.titleSmall),
-                if (subtitle != null)
+                Text(
+                  title,
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.2,
+                      ),
+                ),
+                if (subtitle != null) ...[
+                  const SizedBox(height: 2),
                   Text(
                     subtitle!,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -315,13 +349,15 @@ class _NotifRow extends StatelessWidget {
                               .colorScheme
                               .onSurface
                               .withValues(alpha: 0.5),
+                          fontWeight: FontWeight.w500,
                         ),
                   ),
+                ],
               ],
             ),
           ),
           if (trailing != null) ...<Widget>[
-            const SizedBox(width: 8),
+            const SizedBox(width: 12),
             trailing!,
           ],
         ],
