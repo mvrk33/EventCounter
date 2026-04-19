@@ -8,7 +8,6 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../core/auth_service.dart';
 import '../../../core/constants.dart';
 import '../../../app/router.dart';
-import '../screens/restore_data_screen.dart';
 
 class LoginScreen extends ConsumerWidget {
   const LoginScreen({super.key});
@@ -203,10 +202,7 @@ class LoginScreen extends ConsumerWidget {
                                 final credential = await authService.signInWithGoogle();
                                 if (credential == null) return;
                                 if (context.mounted) {
-                                  await Navigator.of(context).push<bool>(
-                                    MaterialPageRoute<bool>(builder: (_) => const RestoreDataScreen()),
-                                  );
-                                  if (context.mounted) context.go('/home');
+                                  context.go('/restore');
                                 }
                               } catch (e) {
                                 if (context.mounted) {
@@ -238,10 +234,7 @@ class LoginScreen extends ConsumerWidget {
                                   final credential = await authService.signInWithApple();
                                   if (credential == null) return;
                                   if (context.mounted) {
-                                    await Navigator.of(context).push<bool>(
-                                      MaterialPageRoute<bool>(builder: (_) => const RestoreDataScreen()),
-                                    );
-                                    if (context.mounted) context.go('/home');
+                                    context.go('/restore');
                                   }
                                 } catch (e) {
                                   if (context.mounted) {
@@ -380,10 +373,7 @@ class LoginScreen extends ConsumerWidget {
     try {
       await authService.signInWithEmailPassword(email: email, password: password);
       if (!context.mounted) return;
-      await Navigator.of(context).push<bool>(
-        MaterialPageRoute<bool>(builder: (_) => const RestoreDataScreen()),
-      );
-      if (context.mounted) context.go('/home');
+      context.go('/restore');
     } on FirebaseAuthException catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

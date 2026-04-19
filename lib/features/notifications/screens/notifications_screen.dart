@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import '../../../core/user_context_provider.dart';
+import '../../../shared/widgets/liquid_glass.dart';
 import '../notification_service.dart';
 
 class NotificationsScreen extends ConsumerStatefulWidget {
@@ -51,6 +53,8 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen>
   @override
   Widget build(BuildContext context) {
     final notificationService = ref.read(notificationServiceProvider);
+    final userContext = ref.watch(userContextProvider);
+    final isStressed = userContext.stressLevel == UserStressLevel.high;
     final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
@@ -160,14 +164,6 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen>
                                 ? () async {
                                     await notificationService
                                         .scheduleTodayEventsNotification();
-                                    if (context.mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(
-                                          content: Text(
-                                              'Morning summary scheduled for 8 AM ✓'),
-                                        ),
-                                      );
-                                    }
                                   }
                                 : null,
                             style: OutlinedButton.styleFrom(
@@ -272,32 +268,33 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen>
 
 // ── Helper widgets ──────────────────────────────────────────────────────────
 
-class _NotifGroup extends StatelessWidget {
+class _NotifGroup extends ConsumerWidget {
   const _NotifGroup({required this.children});
   final List<Widget> children;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final userContext = ref.watch(userContextProvider);
+    final isStressed = userContext.stressLevel == UserStressLevel.high;
     final scheme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      decoration: BoxDecoration(
-        color: scheme.surface,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: scheme.outlineVariant.withValues(alpha: isDark ? 0.2 : 0.5),
-          width: 1,
-        ),
-        boxShadow: <BoxShadow>[
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
-            blurRadius: 15,
-            offset: const Offset(0, 4),
+    
+    return LiquidGlassContainer(
+      color: scheme.primary,
+      opacity: isStressed ? 0.15 : 0.05,
+      blur: isStressed ? 20 : 15,
+      child: Container(
+        decoration: BoxDecoration(
+          color: scheme.surface.withValues(alpha: 0.6),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(
+            color: scheme.outlineVariant.withValues(alpha: isDark ? 0.2 : 0.5),
+            width: 1,
           ),
-        ],
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Column(children: children),
       ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(children: children),
     );
   }
 }

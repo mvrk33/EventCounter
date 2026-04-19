@@ -11,8 +11,10 @@ import '../../../core/auth_service.dart';
 import '../../../core/hive_boxes.dart';
 import '../../../core/constants.dart';
 import '../../../core/sync_service.dart';
+import '../../../core/user_context_provider.dart';
 import '../../../shared/utils/date_helpers.dart';
 import '../../../shared/widgets/bottom_nav.dart';
+import '../../../shared/widgets/liquid_glass.dart';
 import '../../habits/providers/habits_provider.dart';
 import '../../habits/screens/habits_screen.dart';
 import '../../notifications/screens/notifications_screen.dart';
@@ -160,6 +162,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget _eventsTab(BuildContext context) {
     final events = ref.watch(eventsProvider);
     final habits = ref.watch(habitsProvider);
+    final userContext = ref.watch(userContextProvider);
+    final isStressed = userContext.stressLevel == UserStressLevel.high;
+    
     final List<EventModel> visibleEvents = _buildVisibleEvents(events);
 
     // Count how many events are happening this week
@@ -197,7 +202,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             child: _buildGreetingHeader(context, thisWeekCount, habits.length),
           ),
           // ── Insight Dashboard (Replaces "Next Up" spotlight) ──────────
-          if (_searchQuery.isEmpty && _selectedCategory == 'All')
+          if (_searchQuery.isEmpty && _selectedCategory == 'All' && !isStressed)
             SliverToBoxAdapter(
               child: _buildInsightDashboard(context, nextUpEvent, habits),
             ),
@@ -250,68 +255,68 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     if (insights.isEmpty) return const SizedBox.shrink();
 
-    return Container(
-      height: 160,
-      margin: const EdgeInsets.only(top: 8, bottom: 16),
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        physics: const BouncingScrollPhysics(),
-        itemCount: insights.length,
-        itemBuilder: (context, index) {
-          final insight = insights[index];
-          return _InsightCard(
-            width: insight.width,
-            gradient: insight.gradient,
-            onTap: insight.onTap,
-            child: Stack(
-              children: [
-                if (insight.backgroundEmoji != null)
-                  Positioned(
-                    right: -10,
-                    bottom: -10,
-                    child: Text(
-                      insight.backgroundEmoji!,
-                      style: TextStyle(
-                        fontSize: 80,
-                        color: Colors.white.withValues(alpha: 0.1),
-                      ),
-                    ),
-                  ),
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _DashboardTag(label: insight.tag, icon: insight.icon),
-                      const Spacer(),
-                      Text(
-                        insight.title,
-                        style: GoogleFonts.plusJakartaSans(
-                          color: Colors.white,
-                          fontSize: insight.titleSize,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -0.5,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        insight.subtitle,
-                        style: GoogleFonts.plusJakartaSans(
-                          color: Colors.white.withValues(alpha: 0.7),
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
+    final userContext = ref.watch(userContextProvider);
+    final isStressed = userContext.stressLevel == UserStressLevel.high;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+          child: Row(
+            children: [
+              Text(
+                'INSIGHTS',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white.withValues(alpha: 0.4),
+                  letterSpacing: 2.0,
                 ),
-              ],
-            ),
-          );
-        },
+              ),
+              const Spacer(),
+              _buildInsightPageIndicator(insights.length),
+            ],
+          ),
+        ),
+        SizedBox(
+          height: isStressed ? 160 : 190,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            physics: const BouncingScrollPhysics(),
+            itemCount: insights.length,
+            itemBuilder: (context, index) {
+              final insight = insights[index];
+              return Container(
+                width: MediaQuery.of(context).size.width * (isStressed ? 0.75 : 0.82),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                child: _StaggeredAnimatedInsightCard(
+                  insight: insight,
+                  index: index,
+                  compact: isStressed,
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildInsightPageIndicator(int count) {
+    return Row(
+      children: List.generate(
+        count,
+        (index) => Container(
+          width: 4,
+          height: 4,
+          margin: const EdgeInsets.only(left: 4),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: Colors.white.withValues(alpha: index == 0 ? 0.6 : 0.2),
+          ),
+        ),
       ),
     );
   }
@@ -338,8 +343,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         subtitle: diff == 0 ? 'Happening Today' : 'In $diff days',
         gradient: [const Color(0xFF6366F1), const Color(0xFF4338CA)],
         backgroundEmoji: next.emoji,
-        width: 280,
-        titleSize: 20,
+        width: 220,
+        titleSize: 14,
         onTap: () => _showEventDetail(context, next),
       ));
     }
@@ -451,113 +456,90 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget _buildGreetingHeader(
       BuildContext context, int thisWeekCount, int habitCount) {
     final hour = DateTime.now().hour;
+    final userContext = ref.watch(userContextProvider);
+    final isStressed = userContext.stressLevel == UserStressLevel.high;
 
     final String greeting;
-    if (hour < 5) {
-      greeting = 'Late night';
+    if (isStressed) {
+      greeting = 'Breathe deep';
+    } else if (hour < 5) {
+      greeting = 'Late hours';
     } else if (hour < 12) {
-      greeting = 'Good morning';
+      greeting = 'Rise & shine';
     } else if (hour < 17) {
-      greeting = 'Good afternoon';
+      greeting = 'Keep going';
     } else {
-      greeting = 'Good evening';
+      greeting = 'Wind down';
     }
 
     final String dayStr = DateFormat('EEEE').format(DateTime.now());
     final String dateStr = DateFormat('MMMM d').format(DateTime.now());
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
+      padding: const EdgeInsets.fromLTRB(20, 32, 20, 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.end,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '$greeting,',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    dayStr,
-                    style: GoogleFonts.plusJakartaSans(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 34,
-                      letterSpacing: -1.0,
-                    ),
-                  ),
-                ],
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.2),
-                  ),
-                ),
-                child: Row(
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(
-                      hour < 5
-                          ? Icons.nightlight_round
-                          : hour < 17
-                              ? Icons.wb_sunny_rounded
-                              : Icons.wb_twilight_rounded,
-                      size: 16,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                    const SizedBox(width: 8),
                     Text(
-                      dateStr,
+                      '$greeting,',
                       style: GoogleFonts.plusJakartaSans(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: Theme.of(context).colorScheme.onSurface,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.6),
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      dayStr,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 42,
+                        letterSpacing: -1.5,
+                        height: 1.0,
+                      ),
+                    ),
+                    Text(
+                      dateStr.toUpperCase(),
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
+                        letterSpacing: 2.0,
                       ),
                     ),
                   ],
                 ),
               ),
+              _buildLiveClock(context),
             ],
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 32),
           Row(
             children: [
               Expanded(
                 child: _StatCard(
-                  title: 'This Week',
+                  title: 'UPCOMING',
                   value: '$thisWeekCount',
                   icon: Icons.calendar_today_rounded,
-                  color: const Color(0xFF3B82F6),
+                  color: const Color(0xFF6366F1),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 16),
               Expanded(
                 child: _StatCard(
-                  title: 'Habits',
+                  title: 'STREAK',
                   value: '$habitCount',
                   icon: Icons.local_fire_department_rounded,
-                  color: const Color(0xFFF97316),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _StatCard(
-                  title: 'Total',
-                  value: '${ref.watch(eventsProvider).length}',
-                  icon: Icons.all_inclusive_rounded,
-                  color: const Color(0xFFA855F7),
+                  color: const Color(0xFFF59E0B),
                 ),
               ),
             ],
@@ -567,91 +549,137 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
+  Widget _buildLiveClock(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.2),
+        ),
+      ),
+      child: StreamBuilder(
+        stream: Stream.periodic(const Duration(minutes: 1)),
+        builder: (context, snapshot) {
+          return Text(
+            DateFormat('HH:mm').format(DateTime.now()),
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   Widget _buildSearchBar(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
       child: Row(
         children: <Widget>[
           Expanded(
-            child: TextField(
-              controller: _searchController,
-              onChanged: (String value) {
-                _searchDebounce?.cancel();
-                _searchDebounce = Timer(const Duration(milliseconds: 120), () {
-                  if (!mounted) return;
-                  setState(() {
-                    _searchQuery = value.trim().toLowerCase();
+            child: Container(
+              decoration: BoxDecoration(
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.1),
+                    blurRadius: 20,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: TextField(
+                controller: _searchController,
+                onChanged: (String value) {
+                  _searchDebounce?.cancel();
+                  _searchDebounce = Timer(const Duration(milliseconds: 120), () {
+                    if (!mounted) return;
+                    setState(() {
+                      _searchQuery = value.trim().toLowerCase();
+                    });
                   });
-                });
-              },
-              decoration: InputDecoration(
-                prefixIcon: Icon(Icons.search_rounded,
-                    color: scheme.onSurface.withValues(alpha: 0.4)),
-                hintText: 'Search events…',
-                suffixIcon: _searchQuery.isNotEmpty
-                    ? IconButton(
-                        onPressed: () {
-                          _searchController.clear();
-                          setState(() => _searchQuery = '');
-                        },
-                        icon: Icon(Icons.cancel_rounded,
-                            color: scheme.onSurface.withValues(alpha: 0.35),
-                            size: 18),
-                      )
-                    : null,
+                },
+                decoration: InputDecoration(
+                  prefixIcon: Icon(Icons.search_rounded,
+                      color: scheme.primary.withValues(alpha: 0.5)),
+                  hintText: 'Search markers...',
+                  hintStyle: TextStyle(color: scheme.onSurface.withValues(alpha: 0.3)),
+                  fillColor: scheme.surfaceContainerHighest.withValues(alpha: 0.4),
+                  filled: true,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(20),
+                    borderSide: BorderSide.none,
+                  ),
+                  suffixIcon: _searchQuery.isNotEmpty
+                      ? IconButton(
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() => _searchQuery = '');
+                          },
+                          icon: Icon(Icons.close_rounded,
+                              color: scheme.onSurface.withValues(alpha: 0.35),
+                              size: 18),
+                        )
+                      : null,
+                ),
               ),
             ),
           ),
-          const SizedBox(width: 8),
-          // Filter toggle button
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            decoration: BoxDecoration(
-              color: _filtersExpanded
-                  ? scheme.primaryContainer
-                  : scheme.surfaceContainerHighest.withValues(alpha: 0.6),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: IconButton(
-              onPressed: () =>
-                  setState(() => _filtersExpanded = !_filtersExpanded),
-              icon: Icon(
-                Icons.tune_rounded,
-                color: _filtersExpanded
-                    ? scheme.onPrimaryContainer
-                    : scheme.onSurface.withValues(alpha: 0.55),
-              ),
-              tooltip: 'Filter & sort',
-            ),
+          const SizedBox(width: 12),
+          _buildToolButton(
+            context,
+            icon: Icons.tune_rounded,
+            isSelected: _filtersExpanded,
+            onPressed: () => setState(() => _filtersExpanded = !_filtersExpanded),
           ),
           const SizedBox(width: 8),
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            decoration: BoxDecoration(
-              color: _cardView == _HomeCardView.comfortable
-                  ? scheme.secondaryContainer
-                  : scheme.surfaceContainerHighest.withValues(alpha: 0.6),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: IconButton(
-              onPressed: () {
-                _setCardView(
-                  _cardView == _HomeCardView.comfortable
-                      ? _HomeCardView.compact
-                      : _HomeCardView.comfortable,
-                );
-              },
-              icon: Icon(
-                _cardView.icon,
-                color: _cardView == _HomeCardView.comfortable
-                    ? scheme.onSecondaryContainer
-                    : scheme.onSurface.withValues(alpha: 0.55),
-              ),
-              tooltip: 'Card view: ${_cardView.label}',
-            ),
+          _buildToolButton(
+            context,
+            icon: _cardView.icon,
+            isSelected: _cardView == _HomeCardView.comfortable,
+            onPressed: () {
+              _setCardView(
+                _cardView == _HomeCardView.comfortable
+                    ? _HomeCardView.compact
+                    : _HomeCardView.comfortable,
+              );
+            },
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildToolButton(
+    BuildContext context, {
+    required IconData icon,
+    required bool isSelected,
+    required VoidCallback onPressed,
+  }) {
+    final scheme = Theme.of(context).colorScheme;
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      decoration: BoxDecoration(
+        color: isSelected
+            ? scheme.primary
+            : scheme.surfaceContainerHighest.withValues(alpha: 0.4),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: isSelected
+              ? scheme.primary
+              : scheme.outlineVariant.withValues(alpha: 0.1),
+        ),
+      ),
+      child: IconButton(
+        onPressed: onPressed,
+        icon: Icon(
+          icon,
+          color: isSelected ? scheme.onPrimary : scheme.onSurface.withValues(alpha: 0.6),
+        ),
       ),
     );
   }
@@ -920,71 +948,65 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   List<Widget> _buildSectionedSlivers(
       BuildContext context, List<EventModel> events) {
-    final List<Widget> slivers = <Widget>[];
-    final List<EventModel> pinned =
-        events.where((e) => e.isPinned).toList(growable: false);
-    final List<EventModel> regular =
-        events.where((e) => !e.isPinned).toList(growable: false);
+    // Split events into 'Soon' (within 7 days) and 'Later'
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    
+    final soon = events.where((e) {
+      final d = DateTime(e.nextOccurrenceDate.year, e.nextOccurrenceDate.month, e.nextOccurrenceDate.day);
+      final diff = d.difference(today).inDays;
+      return diff >= 0 && diff <= 7;
+    }).toList();
+    
+    final later = events.where((e) {
+      final d = DateTime(e.nextOccurrenceDate.year, e.nextOccurrenceDate.month, e.nextOccurrenceDate.day);
+      final diff = d.difference(today).inDays;
+      return diff > 7 || diff < 0;
+    }).toList();
 
-    if (pinned.isNotEmpty) {
-      slivers.add(_sectionHeader(context, '📌  Pinned'));
-      slivers.add(_eventList(context, pinned));
-    }
-
-    final Map<String, List<EventModel>> sections = <String, List<EventModel>>{
-      '🗓️  This Week': <EventModel>[],
-      '🗓️  This Month': <EventModel>[],
-      '🔭  Later': <EventModel>[],
-      '⏳  Past & Count Up': <EventModel>[],
-    };
-
-    for (final EventModel event in regular) {
-      sections[_bucketFor(event)]!.add(event);
-    }
-
-    for (final MapEntry<String, List<EventModel>> section in sections.entries) {
-      if (section.value.isEmpty) continue;
-      slivers.add(_sectionHeader(context, section.key));
-      slivers.add(_eventList(context, section.value));
-    }
-
-    return slivers;
+    return <Widget>[
+      if (soon.isNotEmpty) ...[
+        _sectionHeader(context, 'UPCOMING SOON', soon.length),
+        _eventList(context, soon),
+      ],
+      if (later.isNotEmpty) ...[
+        _sectionHeader(context, 'ALL EVENTS', later.length),
+        _eventList(context, later),
+      ],
+    ];
   }
 
-  Widget _sectionHeader(BuildContext context, String title) {
-    final scheme = Theme.of(context).colorScheme;
+  Widget _sectionHeader(BuildContext context, String title, int count) {
     return SliverToBoxAdapter(
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 28, 20, 10),
+        padding: const EdgeInsets.fromLTRB(20, 32, 20, 12),
         child: Row(
           children: <Widget>[
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+              width: 3,
+              height: 14,
               decoration: BoxDecoration(
-                color: scheme.secondaryContainer.withValues(alpha: 0.60),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text(
-                title,
-                style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                      color: scheme.onSecondaryContainer,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.2,
-                    ),
+                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.5),
+                borderRadius: BorderRadius.circular(2),
               ),
             ),
             const SizedBox(width: 10),
-            Expanded(
-              child: Container(
-                height: 1,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: <Color>[
-                      scheme.outlineVariant.withValues(alpha: 0.35),
-                      Colors.transparent,
-                    ],
-                  ),
-                ),
+            Text(
+              title,
+              style: GoogleFonts.plusJakartaSans(
+                color: Colors.white.withValues(alpha: 0.4),
+                fontWeight: FontWeight.w900,
+                fontSize: 11,
+                letterSpacing: 2.0,
+              ),
+            ),
+            const Spacer(),
+            Text(
+              '$count',
+              style: GoogleFonts.plusJakartaSans(
+                color: Colors.white.withValues(alpha: 0.2),
+                fontWeight: FontWeight.w800,
+                fontSize: 12,
               ),
             ),
           ],
@@ -1003,22 +1025,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  String _bucketFor(EventModel event) {
-    final DateTime now = DateTime.now();
-    final DateTime today = DateTime(now.year, now.month, now.day);
-    // Use nextOccurrenceDate for recurring events to get the actual upcoming date
-    final DateTime eventDay =
-        DateTime(event.nextOccurrenceDate.year, event.nextOccurrenceDate.month, event.nextOccurrenceDate.day);
-
-    if (event.mode == EventMode.countup || eventDay.isBefore(today)) {
-      return '⏳  Past & Count Up';
-    }
-    final int diff = eventDay.difference(today).inDays;
-    if (diff <= 7) return '🗓️  This Week';
-    if (diff <= 31) return '🗓️  This Month';
-    return '🔭  Later';
-  }
-
   Widget _buildEventTile(BuildContext context, EventModel event) {
     return EventCardPolished(
       event: event,
@@ -1035,9 +1041,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       },
       onDelete: () {
         ref.read(eventsProvider.notifier).deleteEvent(event.id);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Event deleted')),
-        );
       },
       onAddToHomeScreen: () => _addEventToHomeScreen(event),
     );
@@ -1059,10 +1062,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       );
     } else if (result == 'delete' && mounted) {
       ref.read(eventsProvider.notifier).deleteEvent(event.id);
-      // ignore: use_build_context_synchronously
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Event deleted')),
-      );
     } else if (result == 'add_widget' && mounted) {
       _addEventToHomeScreen(event);
     }
@@ -1143,51 +1142,6 @@ class _DashboardInsight {
   final VoidCallback? onTap;
 }
 
-class _InsightCard extends StatelessWidget {
-  const _InsightCard({
-    required this.child,
-    required this.gradient,
-    this.width,
-    this.onTap,
-  });
-
-  final Widget child;
-  final List<Color> gradient;
-  final double? width;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(right: 12),
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          width: width,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(32),
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: gradient,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: gradient.first.withValues(alpha: 0.3),
-                blurRadius: 20,
-                offset: const Offset(0, 10),
-              ),
-            ],
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(32),
-            child: child,
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 class _DashboardTag extends StatelessWidget {
   const _DashboardTag({required this.label, required this.icon});
@@ -1240,83 +1194,41 @@ class _StatCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(28),
         border: Border.all(
-          color: color.withValues(alpha: 0.15),
-          width: 1.5,
+          color: color.withValues(alpha: 0.12),
+          width: 2,
         ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, color: color, size: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                value,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 32,
+                  fontWeight: FontWeight.w900,
+                  color: color,
+                  height: 1.0,
+                ),
+              ),
+              Icon(icon, color: color.withValues(alpha: 0.5), size: 20),
+            ],
           ),
-          const SizedBox(height: 12),
-          Text(
-            value,
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 22,
-              fontWeight: FontWeight.w900,
-              color: color,
-              height: 1.0,
-            ),
-          ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 8),
           Text(
             title,
             style: GoogleFonts.plusJakartaSans(
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
-              color: color.withValues(alpha: 0.7),
-              letterSpacing: 0.5,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Compact pill badge used inside the hero gradient banner.
-class _HeroPill extends StatelessWidget {
-  const _HeroPill({
-    required this.icon,
-    required this.label,
-  });
-
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          Icon(icon, color: Colors.white, size: 14),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: Colors.white,
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              color: color.withValues(alpha: 0.6),
+              letterSpacing: 1.0,
             ),
           ),
         ],
@@ -1324,6 +1236,7 @@ class _HeroPill extends StatelessWidget {
     );
   }
 }
+
 
 enum _EventSort {
   pinnedFirst('Pinned First'),
@@ -1654,6 +1567,218 @@ class _ConfigToggle extends StatelessWidget {
               onChanged: onChanged,
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _StaggeredAnimatedInsightCard extends StatelessWidget {
+  const _StaggeredAnimatedInsightCard({
+    required this.insight,
+    required this.index,
+    this.compact = false,
+  });
+
+  final _DashboardInsight insight;
+  final int index;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final delay = Duration(milliseconds: 100 + index * 50);
+    final curve = Curves.easeInOut;
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      curve: curve,
+      margin: compact
+          ? const EdgeInsets.only(right: 12)
+          : const EdgeInsets.symmetric(vertical: 6),
+      child: TweenAnimationBuilder<double>(
+        tween: Tween(begin: 0.8, end: 1.0),
+        duration: const Duration(milliseconds: 300),
+        curve: curve,
+        builder: (context, scale, child) {
+          return Transform.scale(
+            scale: scale,
+            child: _GlassInsightCard(
+              insight: insight,
+              onTap: insight.onTap,
+              compact: compact,
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _GlassInsightCard extends ConsumerWidget {
+  const _GlassInsightCard({
+    required this.insight,
+    required this.onTap,
+    this.compact = false,
+  });
+
+  final _DashboardInsight insight;
+  final VoidCallback? onTap;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final userContext = ref.watch(userContextProvider);
+    final isStressed = userContext.stressLevel == UserStressLevel.high;
+
+    return GestureDetector(
+      onTap: onTap,
+      onLongPress: () => _showQuickPreview(context, insight),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(32),
+          boxShadow: [
+            BoxShadow(
+              color: insight.gradient.first.withValues(alpha: 0.15),
+              blurRadius: 20,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: LiquidGlassContainer(
+          borderRadius: 32,
+          blur: isStressed ? 25 : 18,
+          opacity: isStressed ? 0.12 : 0.08,
+          color: insight.gradient.first,
+          child: Stack(
+            children: [
+              // Decorative inner glow
+              Positioned(
+                top: -20,
+                right: -20,
+                child: Container(
+                  width: 100,
+                  height: 100,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      colors: [
+                        Colors.white.withValues(alpha: 0.1),
+                        Colors.white.withValues(alpha: 0),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              if (insight.backgroundEmoji != null)
+                Positioned(
+                  right: 12,
+                  bottom: -10,
+                  child: Text(
+                    insight.backgroundEmoji!,
+                    style: TextStyle(
+                      fontSize: compact ? 80 : 110,
+                      color: Colors.white.withValues(alpha: 0.06),
+                    ),
+                  ),
+                ),
+              Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _DashboardTag(label: insight.tag, icon: insight.icon),
+                    const Spacer(),
+                    Text(
+                      insight.title,
+                      style: GoogleFonts.plusJakartaSans(
+                        color: Colors.white.withValues(alpha: 0.95),
+                        fontSize: compact ? 22 : 26,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -1.0,
+                        height: 1.1,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            insight.subtitle,
+                            style: GoogleFonts.plusJakartaSans(
+                              color: Colors.white.withValues(alpha: 0.5),
+                              fontSize: compact ? 12 : 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        Icon(
+                          Icons.arrow_forward_rounded,
+                          size: 16,
+                          color: Colors.white.withValues(alpha: 0.3),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showQuickPreview(BuildContext context, _DashboardInsight insight) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: BorderRadius.circular(24),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                insight.title,
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                insight.subtitle,
+                style: Theme.of(context).textTheme.bodyMedium,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Close'),
+                  ),
+                  if (insight.onTap != null)
+                    FilledButton(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        insight.onTap?.call();
+                      },
+                      child: const Text('View details'),
+                    ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );

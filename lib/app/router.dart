@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../core/auth_service.dart';
 import '../features/auth/screens/login_screen.dart';
+import '../features/auth/screens/restore_data_screen.dart';
 import '../features/events/screens/home_screen.dart';
 
 // Provider to track guest mode
@@ -23,7 +24,15 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
       final bool isSignedIn = ref.read(authServiceProvider).isSignedIn;
       final bool isGuestMode = ref.read(guestModeProvider);
       final bool isOnLogin = state.matchedLocation == '/login';
-      if ((isSignedIn || isGuestMode) && isOnLogin) {
+      final bool isOnRestore = state.matchedLocation == '/restore';
+
+      if (isSignedIn && isOnLogin) {
+        return '/restore';
+      }
+      if (!isSignedIn && isOnRestore) {
+        return '/login';
+      }
+      if (isGuestMode && (isOnLogin || isOnRestore)) {
         return '/home';
       }
       if (!isSignedIn && !isGuestMode && !isOnLogin) {
@@ -39,6 +48,10 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
       GoRoute(
         path: '/home',
         builder: (context, state) => const HomeScreen(),
+      ),
+      GoRoute(
+        path: '/restore',
+        builder: (context, state) => const RestoreDataScreen(),
       ),
     ],
   );

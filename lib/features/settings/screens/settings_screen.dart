@@ -38,11 +38,14 @@ class SettingsScreen extends ConsumerStatefulWidget {
   ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
 }
 
-class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+class _SettingsScreenState extends ConsumerState<SettingsScreen>
+    with SingleTickerProviderStateMixin {
   late final ExportService _exportService;
   late final ShareFilesCallback _shareFiles;
   int _developerTapCount = 0;
   Timer? _developerTapReset;
+  bool _isSyncingNow = false;
+  late final AnimationController _syncRotationController;
 
   static final Uri _githubUri = Uri.parse('https://github.com/mvrk33');
 
@@ -51,11 +54,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     super.initState();
     _exportService = widget.exportService ?? const ExportService();
     _shareFiles = widget.shareFiles ?? Share.shareXFiles;
+    _syncRotationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    );
   }
 
   @override
   void dispose() {
     _developerTapReset?.cancel();
+    _syncRotationController.dispose();
     super.dispose();
   }
 
@@ -116,7 +124,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                padding: const EdgeInsets.symmetric(horizontal: 10),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: <Widget>[
@@ -217,17 +225,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           subtitle: syncService.lastSyncedAt != null
                               ? 'Last: ${_formatDate(syncService.lastSyncedAt!)}'
                               : 'Keep your data backed up and in sync',
-                          trailing: FilledButton.tonal(
-                            style: FilledButton.styleFrom(
-                              visualDensity: VisualDensity.compact,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            ),
-                            onPressed: !isSignedIn
-                                ? null
-                                : () async {
-                                    await syncService.synchronize(messenger: ScaffoldMessenger.of(context));
-                                  },
-                            child: const Text('Sync Now'),
+                        ),
+                        _SettingsDivider(),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
+                          child: _buildSyncNowButton(
+                            scheme: scheme,
+                            isSignedIn: isSignedIn,
+                            syncService: syncService,
                           ),
                         ),
                       ],
@@ -348,22 +353,28 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             ),
                             onPressed: () async {
                               final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
-                              final imported = await _exportService.importEventsJsonFromPicker(
-                                security: pinSecurity,
-                              );
-                              if (imported.isEmpty) {
-                                messenger.showSnackBar(
-                                  const SnackBar(
-                                      content: Text(
-                                          'No backup selected or unsupported format.')),
+                              try {
+                                final imported = await _exportService.importEventsJsonFromPicker(
+                                  security: pinSecurity,
                                 );
-                                return;
+                                if (imported.isEmpty) {
+                                  messenger.showSnackBar(
+                                    const SnackBar(
+                                        content: Text(
+                                            'No backup selected or unsupported format.')),
+                                  );
+                                  return;
+                                }
+                                await ref.read(eventsProvider.notifier).importEvents(imported);
+                                if (!mounted) return;
+                                messenger.showSnackBar(
+                                  SnackBar(content: Text('Imported ${imported.length} events.')),
+                                );
+                              } on FormatException catch (e) {
+                                messenger.showSnackBar(
+                                  SnackBar(content: Text(e.message)),
+                                );
                               }
-                              await ref.read(eventsProvider.notifier).importEvents(imported);
-                              if (!mounted) return;
-                              messenger.showSnackBar(
-                                SnackBar(content: Text('Imported ${imported.length} events.')),
-                              );
                             },
                             child: const Text('Import'),
                           ),
@@ -450,6 +461,97 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
 
 
+  }
+
+  Future<void> _runSyncNow(SyncService syncService) async {
+    if (_isSyncingNow) {
+      return;
+    }
+
+    setState(() {
+      _isSyncingNow = true;
+    });
+    _syncRotationController.repeat();
+
+    try {
+      await syncService.synchronize(messenger: ScaffoldMessenger.of(context));
+    } finally {
+      if (!mounted) {
+        return;
+      }
+      _syncRotationController.stop();
+      setState(() {
+        _isSyncingNow = false;
+      });
+    }
+  }
+
+  Widget _buildSyncNowButton({
+    required ColorScheme scheme,
+    required bool isSignedIn,
+    required SyncService syncService,
+  }) {
+    final bool isDisabled = !isSignedIn || _isSyncingNow;
+    final Color borderColor = _isSyncingNow
+        ? scheme.primary
+        : scheme.outlineVariant.withValues(alpha: 0.35);
+
+    return GestureDetector(
+      onTap: isDisabled ? null : () => _runSyncNow(syncService),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: scheme.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: borderColor, width: 1.5),
+        ),
+        child: Column(
+          children: <Widget>[
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: <Widget>[
+                RotationTransition(
+                  turns: _syncRotationController,
+                  child: Icon(
+                    Icons.sync_rounded,
+                    size: 20,
+                    color: !isSignedIn
+                        ? scheme.onSurface.withValues(alpha: 0.35)
+                        : _isSyncingNow
+                            ? scheme.primary
+                            : scheme.onSurface,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  _isSyncingNow ? 'Syncing...' : 'Sync Now',
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                        color: !isSignedIn
+                            ? scheme.onSurface.withValues(alpha: 0.35)
+                            : _isSyncingNow
+                                ? scheme.primary
+                                : scheme.onSurface,
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+              ],
+            ),
+            if (_isSyncingNow) ...<Widget>[
+              const SizedBox(height: 10),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: LinearProgressIndicator(
+                  minHeight: 4,
+                  backgroundColor: scheme.primary.withValues(alpha: 0.12),
+                  color: scheme.primary,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
   }
 
   String _formatDate(DateTime dt) {

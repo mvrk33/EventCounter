@@ -6,6 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/user_context_provider.dart';
+import '../../../shared/widgets/liquid_glass.dart';
 import '../../../core/constants.dart';
 import '../../notifications/notification_service.dart';
 import '../../../shared/utils/date_helpers.dart';
@@ -90,6 +92,10 @@ class _AddEditEventScreenState extends ConsumerState<AddEditEventScreen> {
     _visualTheme = e?.visualTheme;
     _duration = e?.duration;
 
+    // Reset suggestion flags to allow fresh suggestions on edit
+    _userHasCustomised = false;
+    _suggestionDismissed = false;
+
     _titleController.addListener(_onTitleChanged);
     _refreshNotificationPermissionState();
   }
@@ -172,6 +178,8 @@ class _AddEditEventScreenState extends ConsumerState<AddEditEventScreen> {
   Widget build(BuildContext context) {
     final bool editing = widget.existing != null;
     final scheme = Theme.of(context).colorScheme;
+    final userContext = ref.watch(userContextProvider);
+    final isStressed = userContext.stressLevel == UserStressLevel.high;
 
     // ── Live Theming ────────────────────────────────────────────────
     // Use the pending suggestion's colors if available to "preview" the theme.
@@ -179,7 +187,7 @@ class _AddEditEventScreenState extends ConsumerState<AddEditEventScreen> {
         ? Color(_pendingSuggestion!.primaryColor)
         : null;
     final Color? themeBg = _pendingSuggestion != null
-        ? Color(_pendingSuggestion!.bgColor).withValues(alpha: 1.0)
+        ? Color(_pendingSuggestion!.bgColor).withValues(alpha: 0.15)  // Semi-transparent glass effect
         : null;
 
     return AnimatedTheme(
@@ -228,12 +236,14 @@ class _AddEditEventScreenState extends ConsumerState<AddEditEventScreen> {
                   // ── Date ───────────────────────────────────────────────────────
                   _buildDateTile(context, scheme),
                   const SizedBox(height: 24),
-                  // ── Count unit ─────────────────────────────────────────────
-                  _buildCountUnitSection(context, scheme),
-                  const SizedBox(height: 24),
-                  // ── Recurrence ─────────────────────────────────────────────
-                  _buildRecurrenceSection(context, scheme),
-                  const SizedBox(height: 24),
+                  if (!isStressed) ...[
+                    // ── Count unit ─────────────────────────────────────────────
+                    _buildCountUnitSection(context, scheme),
+                    const SizedBox(height: 24),
+                    // ── Recurrence ─────────────────────────────────────────────
+                    _buildRecurrenceSection(context, scheme),
+                    const SizedBox(height: 24),
+                  ],
                   // ── Reminders ──────────────────────────────────────────────
                   _buildRemindersSection(context, scheme),
                   const SizedBox(height: 24),
@@ -244,7 +254,7 @@ class _AddEditEventScreenState extends ConsumerState<AddEditEventScreen> {
                   _buildChecklistSection(context, scheme),
                   const SizedBox(height: 24),
                   // ── Advanced section ───────────────────────────────────────────
-                  _buildAdvancedSection(context, scheme),
+                  if (!isStressed) _buildAdvancedSection(context, scheme),
                 ]),
               ),
             ),
@@ -260,40 +270,17 @@ class _AddEditEventScreenState extends ConsumerState<AddEditEventScreen> {
             ),
           ),
           child: SafeArea(
-            child: Container(
-              decoration: BoxDecoration(
-                boxShadow: [
-                  BoxShadow(
-                    color: scheme.primary.withValues(alpha: 0.2),
-                    blurRadius: 20,
-                    offset: const Offset(0, 8),
+            child: AdaptiveButton(
+              onPressed: _save,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(editing ? Icons.check_rounded : Icons.add_rounded),
+                  const SizedBox(width: 10),
+                  Text(
+                    editing ? 'Update Event' : 'Create Event',
                   ),
                 ],
-              ),
-              child: FilledButton(
-                onPressed: _save,
-                style: FilledButton.styleFrom(
-                  minimumSize: const Size(double.infinity, 56),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  backgroundColor: scheme.primary,
-                  foregroundColor: scheme.onPrimary,
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(editing ? Icons.check_rounded : Icons.add_rounded),
-                    const SizedBox(width: 10),
-                    Text(
-                      editing ? 'Update Event' : 'Create Event',
-                      style: GoogleFonts.nunito(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ],
-                ),
               ),
             ),
           ),
@@ -1852,32 +1839,23 @@ class _SectionLabel extends StatelessWidget {
   }
 }
 
-class _FormCard extends StatelessWidget {
-  const _FormCard({required this.child, this.padding});
+class _FormCard extends ConsumerWidget {
+  const _FormCard({required this.child, this.padding, super.key});
   final Widget child;
   final EdgeInsets? padding;
 
   @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
-      decoration: BoxDecoration(
-        color: scheme.surface,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: scheme.outlineVariant.withValues(alpha: 0.4),
-          width: 1.5,
-        ),
-        boxShadow: <BoxShadow>[
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
-          ),
-        ],
+  Widget build(BuildContext context, WidgetRef ref) {
+    final userContext = ref.watch(userContextProvider);
+    final isStressed = userContext.stressLevel == UserStressLevel.high;
+    
+    return LiquidGlassContainer(
+      blur: isStressed ? 20 : 15,
+      opacity: isStressed ? 0.12 : 0.08,
+      child: Padding(
+        padding: padding ?? const EdgeInsets.all(20),
+        child: child,
       ),
-      padding: padding ?? const EdgeInsets.all(20),
-      child: child,
     );
   }
 }

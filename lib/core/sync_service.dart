@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -58,6 +59,21 @@ class SyncService {
   final Connectivity _connectivity;
   bool _cloudSyncBlocked = false;
 
+  // ── Passphrase-based cloud encryption ─────────────────────────────────────
+  // Derived from the user's UID so it's stable across reinstalls and devices.
+  // Salt is a constant app-specific string — no per-device secret needed.
+  static const String _cloudSalt = 'daymark_cloud_v1';
+
+  /// Returns the passphrase used to encrypt/decrypt cloud payloads for the
+  /// current user. This is deterministic: same uid → same passphrase every time.
+  String _cloudPassphrase() {
+    final String uid = _authService.currentUser!.uid;
+    // Simple derivation: base64(uid bytes) to ensure valid characters.
+    return base64Encode(utf8.encode(uid));
+  }
+
+  // ── Auto-restore flag ──────────────────────────────────────────────────────
+
   String _autoRestoreDisabledKeyForCurrentUser() {
     final String uid = _authService.currentUser?.uid ?? 'guest';
     return 'disable_auto_restore_$uid';
@@ -71,98 +87,79 @@ class SyncService {
   }
 
   Future<void> setAutoRestoreEnabled(bool enabled) async {
-    if (_syncMetaBox == null) {
-      return;
-    }
+    if (_syncMetaBox == null) return;
     await _syncMetaBox.put(_autoRestoreDisabledKeyForCurrentUser(), !enabled);
   }
 
+  // ── First restore screen completion flag ────────────────────────────────────
+  // Industry standard: show restore backup prompt only once on first login.
+
+  String _restoreScreenCompletedKeyForCurrentUser() {
+    final String uid = _authService.currentUser?.uid ?? 'guest';
+    return 'restore_screen_completed_$uid';
+  }
+
+  /// Check if the user has already seen and completed the restore screen.
+  /// Returns true if already shown, false if it should be shown.
+  Future<bool> hasCompletedRestoreScreen() async {
+    final bool completed =
+        (_syncMetaBox?.get(_restoreScreenCompletedKeyForCurrentUser()) as bool?) ??
+            false;
+    return completed;
+  }
+
+  /// Mark the restore screen as completed for this user.
+  /// Call this after the user makes a choice (restore/start fresh).
+  Future<void> markRestoreScreenCompleted() async {
+    if (_syncMetaBox == null) return;
+    await _syncMetaBox.put(_restoreScreenCompletedKeyForCurrentUser(), true);
+  }
+
+  // ── Local data management ─────────────────────────────────────────────────
+
   Future<void> startFreshLocalData({ScaffoldMessengerState? messenger}) async {
     if (_eventsBox == null || _habitsBox == null) {
-      _showSnackBar(messenger, 'Local storage unavailable.');
       return;
     }
-
     await _eventsBox.clear();
     await _habitsBox.clear();
     if (_syncMetaBox != null) {
       await _syncMetaBox.delete('last_synced_at');
       await _syncMetaBox.put('pending_sync', false);
     }
-    _showSnackBar(messenger, 'Started fresh with empty local data.');
   }
 
   Future<void> clearCloudBackup({ScaffoldMessengerState? messenger}) async {
     if (!_canCloudSync()) {
-      _showSnackBar(
-          messenger, 'Cloud backup unavailable in guest/offline mode.');
       return;
     }
-
     try {
       final String uid = _authService.currentUser!.uid;
-      final CollectionReference<Map<String, dynamic>> eventsRef =
-          _firestore!.collection('users').doc(uid).collection('events');
-      final CollectionReference<Map<String, dynamic>> habitsRef =
-          _firestore.collection('users').doc(uid).collection('habits');
-
-      final QuerySnapshot<Map<String, dynamic>> eventsSnapshot =
-          await eventsRef.get();
-      final QuerySnapshot<Map<String, dynamic>> habitsSnapshot =
-          await habitsRef.get();
-
-      await _deleteDocsInBatches(
-          eventsSnapshot.docs.map((doc) => doc.reference));
-      await _deleteDocsInBatches(
-          habitsSnapshot.docs.map((doc) => doc.reference));
-
+      final eventsSnapshot = await _firestore!
+          .collection('users').doc(uid).collection('events').get();
+      final habitsSnapshot = await _firestore
+          .collection('users').doc(uid).collection('habits').get();
+      await _deleteDocsInBatches(eventsSnapshot.docs.map((d) => d.reference));
+      await _deleteDocsInBatches(habitsSnapshot.docs.map((d) => d.reference));
       await _setLastSyncedNow();
-      _showSnackBar(messenger, 'Cloud backup cleared (events/habits only).');
     } catch (error) {
       debugPrint('Failed to clear cloud backup: $error');
-      _showSnackBar(messenger, 'Failed to clear cloud backup.');
     }
   }
 
   Future<CloudBackupSummary> getCloudBackupSummary() async {
-    if (!_canCloudSync()) {
+    if (!_canCloudSync() || _firestore == null) {
       return const CloudBackupSummary(eventsCount: 0, habitsCount: 0);
     }
-    final FirebaseFirestore? firestore = _firestore;
-    if (firestore == null) {
-      return const CloudBackupSummary(eventsCount: 0, habitsCount: 0);
-    }
-
     try {
       final String uid = _authService.currentUser!.uid;
-      // Run queries in parallel for better latency (vs sequential)
-      final Future<QuerySnapshot<Map<String, dynamic>>> eventsFuture =
-          firestore
-              .collection('users')
-              .doc(uid)
-              .collection('events')
-              .get();
-      final Future<QuerySnapshot<Map<String, dynamic>>> habitsFuture =
-          firestore
-              .collection('users')
-              .doc(uid)
-              .collection('habits')
-              .get();
-
-      // Execute both in parallel instead of waiting for first to complete
-      final List<QuerySnapshot<Map<String, dynamic>>> results =
-          await Future.wait<QuerySnapshot<Map<String, dynamic>>>(
-        <Future<QuerySnapshot<Map<String, dynamic>>>>[
-          eventsFuture,
-          habitsFuture,
-        ],
-      );
-      final int eventsCount = results[0].docs.length;
-      final int habitsCount = results[1].docs.length;
-
+      final results = await Future.wait([
+        _firestore!.collection('users').doc(uid).collection('events').get(),
+        _firestore.collection('users').doc(uid).collection('habits').get(),
+      ]);
       return CloudBackupSummary(
-        eventsCount: eventsCount,
-        habitsCount: habitsCount,
+        eventsCount: results[0].docs.length,
+        habitsCount: results[1].docs.length,
       );
     } catch (error) {
       _disableCloudSyncIfDatabaseMissing(error);
@@ -172,266 +169,195 @@ class SyncService {
 
   DateTime? get lastSyncedAt {
     final String? iso = _syncMetaBox?.get('last_synced_at') as String?;
-    if (iso == null || iso.isEmpty) {
-      return null;
-    }
+    if (iso == null || iso.isEmpty) return null;
     return DateTime.tryParse(iso);
   }
 
+  // ── Sync / Restore ────────────────────────────────────────────────────────
+
   Future<void> synchronize({ScaffoldMessengerState? messenger}) async {
     if (!_canCloudSync()) {
-      _showSnackBar(messenger, 'Cloud sync unavailable in guest/offline mode.');
       return;
     }
-
     try {
-      // 1. Pull changes from cloud (Restore)
-      // We pass null to messenger to avoid showing multiple snackbars
       await restoreAll(messenger: null);
-
-      // 2. Push local changes to cloud (Sync)
-      await syncAll(messenger: messenger);
+      await syncAll(messenger: null);
     } catch (error) {
       debugPrint('Full synchronization failed: $error');
-      _showSnackBar(messenger, 'Sync failed. Will retry when online.');
     }
   }
 
   Future<void> syncAll({ScaffoldMessengerState? messenger}) async {
     if (!_canCloudSync()) {
-      _showSnackBar(messenger, 'Cloud sync unavailable in guest/offline mode.');
       return;
     }
-
     if (_eventsBox == null || _habitsBox == null) {
-      _showSnackBar(messenger, 'Local storage unavailable.');
       return;
     }
-
     try {
       final WriteBatch batch = _firestore!.batch();
       final String uid = _authService.currentUser!.uid;
 
       for (final EventModel event in _eventsBox.values) {
-        final DocumentReference<Map<String, dynamic>> ref =
-            _eventDoc(uid, event.id);
         final Map<String, dynamic>? payload = await _eventCloudPayload(event);
         if (payload == null) {
-          _showSnackBar(messenger, 'Encryption key unavailable. Sync failed.');
           return;
         }
-        batch.set(ref, payload, SetOptions(merge: true));
+        batch.set(_eventDoc(uid, event.id), payload, SetOptions(merge: true));
       }
 
       for (final HabitModel habit in _habitsBox.values) {
-        final DocumentReference<Map<String, dynamic>> ref =
-            _habitDoc(uid, habit.id);
         final Map<String, dynamic>? payload = await _habitCloudPayload(habit);
         if (payload == null) {
-          _showSnackBar(messenger, 'Encryption key unavailable. Sync failed.');
           return;
         }
-        batch.set(ref, payload, SetOptions(merge: true));
+        batch.set(_habitDoc(uid, habit.id), payload, SetOptions(merge: true));
       }
 
       await batch.commit();
       await _setLastSyncedNow();
-      _showSnackBar(messenger, 'Sync completed successfully.');
     } catch (error) {
       debugPrint('Sync all failed: $error');
       _disableCloudSyncIfDatabaseMissing(error);
-      _showSnackBar(messenger, 'Sync failed. Will retry when online.');
       await _enqueuePendingSync();
     }
   }
 
-  Future<void> restoreAll({ScaffoldMessengerState? messenger}) async {
-    if (!_canCloudSync()) {
-      return;
+  Future<RestoreResult> restoreAll({ScaffoldMessengerState? messenger}) async {
+    if (!_canCloudSync() || _eventsBox == null || _habitsBox == null) {
+      return const RestoreResult(restored: 0, decryptionFailures: 0);
     }
-
-    if (_eventsBox == null || _habitsBox == null) {
-      return;
-    }
-
     try {
       final String uid = _authService.currentUser!.uid;
-      final QuerySnapshot<Map<String, dynamic>> eventsSnapshot =
-          await _firestore!
-              .collection('users')
-              .doc(uid)
-              .collection('events')
-              .get();
-      final QuerySnapshot<Map<String, dynamic>> habitsSnapshot =
-          await _firestore
-              .collection('users')
-              .doc(uid)
-              .collection('habits')
-              .get();
+      int restoredEvents = 0;
+      int restoredHabits = 0;
+      int skippedEncrypted = 0;
 
-      for (final QueryDocumentSnapshot<Map<String, dynamic>> doc
-          in eventsSnapshot.docs) {
-        final EventModel? remoteEvent = await _eventFromCloud(doc.data());
+      final results = await Future.wait([
+        _firestore!.collection('users').doc(uid).collection('events').get(),
+        _firestore.collection('users').doc(uid).collection('habits').get(),
+      ]);
+      final eventsSnapshot = results[0];
+      final habitsSnapshot = results[1];
+
+      for (final doc in eventsSnapshot.docs) {
+        final remoteData = doc.data();
+        final EventModel? remoteEvent = await _eventFromCloud(remoteData);
         if (remoteEvent == null) {
+          if ((remoteData['encrypted'] as bool?) == true) skippedEncrypted++;
           continue;
         }
-        final EventModel? localEvent = _eventsBox.get(remoteEvent.id);
-        if (localEvent == null ||
-            remoteEvent.updatedAt.isAfter(localEvent.updatedAt)) {
+        final EventModel? local = _eventsBox.get(remoteEvent.id);
+        if (local == null || remoteEvent.updatedAt.isAfter(local.updatedAt)) {
           await _eventsBox.put(remoteEvent.id, remoteEvent);
+          restoredEvents++;
         }
       }
 
-      for (final QueryDocumentSnapshot<Map<String, dynamic>> doc
-          in habitsSnapshot.docs) {
-        final HabitModel? remoteHabit = await _habitFromCloud(doc.data());
+      for (final doc in habitsSnapshot.docs) {
+        final remoteData = doc.data();
+        final HabitModel? remoteHabit = await _habitFromCloud(remoteData);
         if (remoteHabit == null) {
+          if ((remoteData['encrypted'] as bool?) == true) skippedEncrypted++;
           continue;
         }
-        final HabitModel? localHabit = _habitsBox.get(remoteHabit.id);
-        if (localHabit == null ||
-            remoteHabit.updatedAt.isAfter(localHabit.updatedAt)) {
+        final HabitModel? local = _habitsBox.get(remoteHabit.id);
+        if (local == null || remoteHabit.updatedAt.isAfter(local.updatedAt)) {
           await _habitsBox.put(remoteHabit.id, remoteHabit);
+          restoredHabits++;
         }
       }
 
       await _setLastSyncedNow();
-      _showSnackBar(messenger, 'Restore completed.');
+      return RestoreResult(
+          restored: restoredEvents + restoredHabits, decryptionFailures: skippedEncrypted);
     } catch (error) {
       debugPrint('Restore all failed: $error');
       _disableCloudSyncIfDatabaseMissing(error);
-      _showSnackBar(messenger, 'Restore failed.');
+      return const RestoreResult(restored: 0, decryptionFailures: 0);
     }
   }
 
   Future<void> syncEvent(EventModel event) async {
-    if (_eventsBox != null) {
-      await _eventsBox.put(event.id, event);
-    }
-    if (!_canCloudSync()) {
-      await _enqueuePendingSync();
-      return;
-    }
-
-    final Map<String, dynamic>? payload = await _eventCloudPayload(event);
-    if (payload == null) {
-      await _enqueuePendingSync();
-      return;
-    }
+    if (_eventsBox != null) await _eventsBox.put(event.id, event);
+    if (!_canCloudSync()) { await _enqueuePendingSync(); return; }
+    final payload = await _eventCloudPayload(event);
+    if (payload == null) { await _enqueuePendingSync(); return; }
     await _eventDoc(_authService.currentUser!.uid, event.id)
         .set(payload, SetOptions(merge: true));
     await _setLastSyncedNow();
   }
 
   Future<void> syncHabit(HabitModel habit) async {
-    if (_habitsBox != null) {
-      await _habitsBox.put(habit.id, habit);
-    }
-    if (!_canCloudSync()) {
-      await _enqueuePendingSync();
-      return;
-    }
-
-    final Map<String, dynamic>? payload = await _habitCloudPayload(habit);
-    if (payload == null) {
-      await _enqueuePendingSync();
-      return;
-    }
+    if (_habitsBox != null) await _habitsBox.put(habit.id, habit);
+    if (!_canCloudSync()) { await _enqueuePendingSync(); return; }
+    final payload = await _habitCloudPayload(habit);
+    if (payload == null) { await _enqueuePendingSync(); return; }
     await _habitDoc(_authService.currentUser!.uid, habit.id)
         .set(payload, SetOptions(merge: true));
     await _setLastSyncedNow();
   }
 
   Future<void> deleteEvent(String id) async {
-    if (_eventsBox != null) {
-      await _eventsBox.delete(id);
-    }
-    if (!_canCloudSync()) {
-      await _enqueuePendingSync();
-      return;
-    }
+    if (_eventsBox != null) await _eventsBox.delete(id);
+    if (!_canCloudSync()) { await _enqueuePendingSync(); return; }
     await _eventDoc(_authService.currentUser!.uid, id).delete();
     await _setLastSyncedNow();
   }
 
   Future<void> deleteHabit(String id) async {
-    if (_habitsBox != null) {
-      await _habitsBox.delete(id);
-    }
-    if (!_canCloudSync()) {
-      await _enqueuePendingSync();
-      return;
-    }
+    if (_habitsBox != null) await _habitsBox.delete(id);
+    if (!_canCloudSync()) { await _enqueuePendingSync(); return; }
     await _habitDoc(_authService.currentUser!.uid, id).delete();
     await _setLastSyncedNow();
   }
 
   Future<void> replayPendingSync() async {
     final bool pending = (_syncMetaBox?.get('pending_sync') as bool?) ?? false;
-    if (!pending) {
-      return;
-    }
-    final List<ConnectivityResult> connectivity =
-        await _connectivity.checkConnectivity();
-    // Check if device is online (has ANY connection that is NOT none)
-    if (connectivity.every((ConnectivityResult e) => e == ConnectivityResult.none)) {
-      return;
-    }
+    if (!pending) return;
+    final connectivity = await _connectivity.checkConnectivity();
+    if (connectivity.every((e) => e == ConnectivityResult.none)) return;
     try {
       await syncAll();
-      if (_syncMetaBox != null) {
-        await _syncMetaBox.put('pending_sync', false);
-      }
+      await _syncMetaBox?.put('pending_sync', false);
     } catch (e) {
       debugPrint('Pending sync replay failed: $e');
-      // Keep pending_sync flag set to retry later
     }
   }
 
-  bool _canCloudSync() {
-    return !_cloudSyncBlocked && _firestore != null && _authService.isSignedIn;
-  }
+  // ── Encryption helpers ────────────────────────────────────────────────────
 
-  void _disableCloudSyncIfDatabaseMissing(Object error) {
-    final bool isFirebaseError = error is FirebaseException;
-    if (!isFirebaseError) {
-      return;
-    }
-
-    final FirebaseException firebaseError = error;
-    final String message = (firebaseError.message ?? '').toLowerCase();
-    final bool missingDefaultDatabase =
-        firebaseError.code == 'not-found' && message.contains('database (default) does not exist');
-    if (missingDefaultDatabase) {
-      _cloudSyncBlocked = true;
-      _syncMetaBox?.put('pending_sync', false);
-      _syncMetaBox?.put('cloud_sync_blocked_missing_firestore', true);
-    }
-  }
-
-  // Encryption is always on for cloud sync.
+  /// Encrypts [json] with the UID-derived passphrase (survives reinstall).
   Future<Map<String, dynamic>?> _eventCloudPayload(EventModel event) async {
-    await _pinSecurityService.ensureEncryptionKey();
-    final Map<String, String>? encrypted =
-        await _pinSecurityService.encryptJson(event.toJson());
+    final Map<String, String>? encrypted = await _pinSecurityService
+        .encryptStringWithPassphrase(
+          jsonEncode(event.toJson()),
+          _cloudPassphrase(),
+          salt: _cloudSalt,
+        );
     if (encrypted == null) return null;
     return <String, dynamic>{
       'id': event.id,
       'updatedAt': Timestamp.fromDate(event.updatedAt),
       'encrypted': true,
+      'encVersion': 2,
       'payload': encrypted,
     };
   }
 
   Future<Map<String, dynamic>?> _habitCloudPayload(HabitModel habit) async {
-    await _pinSecurityService.ensureEncryptionKey();
-    final Map<String, String>? encrypted =
-        await _pinSecurityService.encryptJson(habit.toJson());
+    final Map<String, String>? encrypted = await _pinSecurityService
+        .encryptStringWithPassphrase(
+          jsonEncode(habit.toJson()),
+          _cloudPassphrase(),
+          salt: _cloudSalt,
+        );
     if (encrypted == null) return null;
     return <String, dynamic>{
       'id': habit.id,
       'updatedAt': Timestamp.fromDate(habit.updatedAt),
       'encrypted': true,
+      'encVersion': 2,
       'payload': encrypted,
     };
   }
@@ -440,15 +366,32 @@ class SyncService {
     if ((data['encrypted'] as bool?) != true) {
       return EventModel.fromFirestore(data);
     }
-    final dynamic payload = data['payload'];
-    if (payload is! Map) {
+    final dynamic rawPayload = data['payload'];
+    if (rawPayload is! Map) return null;
+    final payload = rawPayload.cast<String, dynamic>();
+
+    final int encVersion = (data['encVersion'] as num?)?.toInt() ?? 1;
+
+    if (encVersion == 2) {
+      // Passphrase-based: survives reinstall
+      final String? clear = await _pinSecurityService
+          .decryptStringWithPassphrase(
+            payload,
+            _cloudPassphrase(),
+            salt: _cloudSalt,
+          );
+      if (clear == null) return null;
+      final dynamic decoded = jsonDecode(clear);
+      if (decoded is Map) {
+        return EventModel.fromJson(decoded.cast<String, dynamic>());
+      }
       return null;
     }
+
+    // encVersion == 1: old device-key encryption — cannot decrypt after reinstall
     final Map<String, dynamic>? decrypted =
-        await _pinSecurityService.decryptJson(payload.cast<String, dynamic>());
-    if (decrypted == null) {
-      return null;
-    }
+        await _pinSecurityService.decryptJson(payload);
+    if (decrypted == null) return null;
     return EventModel.fromJson(decrypted);
   }
 
@@ -456,71 +399,82 @@ class SyncService {
     if ((data['encrypted'] as bool?) != true) {
       return HabitModel.fromFirestore(data);
     }
-    final dynamic payload = data['payload'];
-    if (payload is! Map) {
+    final dynamic rawPayload = data['payload'];
+    if (rawPayload is! Map) return null;
+    final payload = rawPayload.cast<String, dynamic>();
+
+    final int encVersion = (data['encVersion'] as num?)?.toInt() ?? 1;
+
+    if (encVersion == 2) {
+      final String? clear = await _pinSecurityService
+          .decryptStringWithPassphrase(
+            payload,
+            _cloudPassphrase(),
+            salt: _cloudSalt,
+          );
+      if (clear == null) return null;
+      final dynamic decoded = jsonDecode(clear);
+      if (decoded is Map) {
+        return HabitModel.fromJson(decoded.cast<String, dynamic>());
+      }
       return null;
     }
+
     final Map<String, dynamic>? decrypted =
-        await _pinSecurityService.decryptJson(payload.cast<String, dynamic>());
-    if (decrypted == null) {
-      return null;
-    }
+        await _pinSecurityService.decryptJson(payload);
+    if (decrypted == null) return null;
     return HabitModel.fromJson(decrypted);
   }
 
-  Future<void> _setLastSyncedNow() async {
-    if (_syncMetaBox != null) {
-      await _syncMetaBox.put(
-          'last_synced_at', DateTime.now().toUtc().toIso8601String());
+  // ── Private helpers ───────────────────────────────────────────────────────
+
+  bool _canCloudSync() =>
+      !_cloudSyncBlocked && _firestore != null && _authService.isSignedIn;
+
+  void _disableCloudSyncIfDatabaseMissing(Object error) {
+    if (error is! FirebaseException) return;
+    final String message = (error.message ?? '').toLowerCase();
+    if (error.code == 'not-found' &&
+        message.contains('database (default) does not exist')) {
+      _cloudSyncBlocked = true;
+      _syncMetaBox?.put('pending_sync', false);
+      _syncMetaBox?.put('cloud_sync_blocked_missing_firestore', true);
     }
+  }
+
+  Future<void> _setLastSyncedNow() async {
+    await _syncMetaBox?.put(
+        'last_synced_at', DateTime.now().toUtc().toIso8601String());
   }
 
   Future<void> _enqueuePendingSync() async {
-    if (_syncMetaBox != null) {
-      await _syncMetaBox.put('pending_sync', true);
-    }
+    await _syncMetaBox?.put('pending_sync', true);
   }
 
-  DocumentReference<Map<String, dynamic>> _eventDoc(String uid, String id) {
-    return _firestore!
-        .collection('users')
-        .doc(uid)
-        .collection('events')
-        .doc(id);
-  }
+  DocumentReference<Map<String, dynamic>> _eventDoc(String uid, String id) =>
+      _firestore!.collection('users').doc(uid).collection('events').doc(id);
 
-  DocumentReference<Map<String, dynamic>> _habitDoc(String uid, String id) {
-    return _firestore!
-        .collection('users')
-        .doc(uid)
-        .collection('habits')
-        .doc(id);
-  }
+  DocumentReference<Map<String, dynamic>> _habitDoc(String uid, String id) =>
+      _firestore!.collection('users').doc(uid).collection('habits').doc(id);
 
   Future<void> _deleteDocsInBatches(
     Iterable<DocumentReference<Map<String, dynamic>>> refs,
   ) async {
     const int maxWritesPerBatch = 450;
-    final List<DocumentReference<Map<String, dynamic>>> list = refs.toList();
+    final list = refs.toList();
     for (int i = 0; i < list.length; i += maxWritesPerBatch) {
-      final int end = (i + maxWritesPerBatch < list.length)
-          ? i + maxWritesPerBatch
-          : list.length;
+      final int end =
+          (i + maxWritesPerBatch < list.length) ? i + maxWritesPerBatch : list.length;
       final WriteBatch batch = _firestore!.batch();
-      for (int j = i; j < end; j++) {
-        batch.delete(list[j]);
-      }
+      for (int j = i; j < end; j++) batch.delete(list[j]);
       await batch.commit();
     }
   }
 
-  void _showSnackBar(ScaffoldMessengerState? messenger, String text) {
-    if (messenger == null) {
-      return;
-    }
-    messenger.showSnackBar(SnackBar(content: Text(text)));
-  }
+  // ...existing code...
 }
+
+// ── Data classes ───────────────────────────────────────────────────────────
 
 class CloudBackupSummary {
   const CloudBackupSummary({
@@ -533,3 +487,17 @@ class CloudBackupSummary {
 
   bool get hasBackup => eventsCount > 0 || habitsCount > 0;
 }
+
+class RestoreResult {
+  const RestoreResult({
+    required this.restored,
+    required this.decryptionFailures,
+  });
+
+  final int restored;
+  final int decryptionFailures;
+
+  /// True when cloud had data but NONE could be decrypted.
+  bool get isDecryptionFailure => decryptionFailures > 0 && restored == 0;
+}
+

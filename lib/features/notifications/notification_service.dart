@@ -364,7 +364,7 @@ class NotificationService {
       } else if (daysUntil == 1) {
         subtitle = 'Tomorrow – 1 day to go';
       } else {
-        subtitle = '$daysUntil days to go';
+        subtitle = '$daysUntil ${daysUntil == 1 ? 'day' : 'days'} to go';
       }
     } else {
       // Count-up: days since the event.

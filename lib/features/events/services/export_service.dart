@@ -38,11 +38,11 @@ class ExportService {
       events.map((EventModel e) => e.toJson()).toList(growable: false),
     );
 
-    // Passphrase-based encryption (portable, cross-device)
+    // Optional passphrase-based encryption (portable, cross-device).
+    // If no passphrase is provided, export plaintext JSON for reinstall safety.
     if (passphraseForBackup != null &&
         passphraseForBackup.isNotEmpty &&
-        security != null &&
-        security.isPassphraseBackupEncryptionEnabled) {
+        security != null) {
       final String? salt = security.passphraseBackupSalt;
       if (salt != null) {
         final Map<String, String>? encrypted =
@@ -61,20 +61,6 @@ class ExportService {
           });
           return file.writeAsString(wrapped, flush: true);
         }
-      }
-    }
-
-    // Device-key encryption (local only)
-    if (security != null && security.isLocalBackupEncryptionEnabled) {
-      final Map<String, String>? encrypted =
-          await security.encryptString(payload);
-      if (encrypted != null) {
-        final String wrapped = jsonEncode(<String, dynamic>{
-          'encrypted': true,
-          'version': 1,
-          'payload': encrypted,
-        });
-        return file.writeAsString(wrapped, flush: true);
       }
     }
 
@@ -158,11 +144,20 @@ class ExportService {
       return <EventModel>[];
     }
 
-    return parseEventsFromBackupRaw(
+    final List<EventModel> parsed = await parseEventsFromBackupRaw(
       raw,
       security: security,
       passphraseForRestore: passphraseForRestore,
     );
+
+    if (parsed.isEmpty && _isEncryptedBackupRaw(raw)) {
+      throw const FormatException(
+        'Encrypted backup could not be decrypted on this install. '
+        'Use a passphrase backup, CSV, or restore on the original install.',
+      );
+    }
+
+    return parsed;
   }
 
   Future<List<EventModel>> parseEventsFromBackupRaw(
@@ -349,6 +344,19 @@ class ExportService {
     return map.containsKey('id') &&
         map.containsKey('title') &&
         map.containsKey('date');
+  }
+
+  bool _isEncryptedBackupRaw(String raw) {
+    dynamic decoded;
+    try {
+      decoded = jsonDecode(raw);
+    } on FormatException {
+      return false;
+    }
+    if (decoded is! Map) {
+      return false;
+    }
+    return _looksEncryptedPayload(_mapToStringDynamic(decoded));
   }
 
   bool _matchesCsvHeader(List<String> header) {

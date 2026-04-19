@@ -2,13 +2,13 @@ import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 import '../../../core/auth_service.dart';
 import '../../../core/hive_boxes.dart';
 import '../../../core/sync_service.dart';
 import '../../../app/router.dart';
+import '../../auth/screens/restore_data_screen.dart';
 
 class AccountScreen extends ConsumerWidget {
   const AccountScreen({super.key});
@@ -20,249 +20,151 @@ class AccountScreen extends ConsumerWidget {
     final sync = ref.read(syncServiceProvider);
     final user = authState.value;
     final ColorScheme scheme = Theme.of(context).colorScheme;
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
     final bool supportsAppleSignIn =
         !kIsWeb &&
         (defaultTargetPlatform == TargetPlatform.iOS ||
             defaultTargetPlatform == TargetPlatform.macOS);
 
     return Scaffold(
-      extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: Text(
-          'Account Details',
-          style: GoogleFonts.plusJakartaSans(
-            fontWeight: FontWeight.w800,
-            fontSize: 20,
-          ),
-        ),
-        centerTitle: true,
-        backgroundColor: Colors.transparent,
-        elevation: 0,
+        title: const Text('Account'),
+        centerTitle: false,
       ),
-      body: Stack(
-        children: [
-          // ── Premium background ──────────────────────────────────────────
-          Container(
-            width: double.infinity,
-            height: double.infinity,
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Color(0xFF1A1C2E), Color(0xFF12131F)],
-              ),
-            ),
-          ),
-          // ── Decorative Glow ─────────────────────────────────────────────
-          Positioned(
-            top: -100,
-            right: -100,
-            child: Container(
-              width: 300,
-              height: 300,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: scheme.primary.withValues(alpha: 0.08),
-              ),
-            ),
-          ),
-          SafeArea(
-            child: ListView(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-              children: <Widget>[
-                // ── Profile Header ──────────────────────────────────────────
-                Container(
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.05),
-                    borderRadius: BorderRadius.circular(32),
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.1),
-                      width: 1.5,
-                    ),
-                  ),
-                  child: Column(
-                    children: [
-                      Stack(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(4),
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(color: scheme.primary, width: 2),
-                            ),
-                            child: CircleAvatar(
-                              radius: 44,
-                              backgroundColor: Colors.white.withValues(alpha: 0.1),
-                              backgroundImage: user?.photoURL == null || user!.photoURL!.isEmpty
-                                  ? null
-                                  : NetworkImage(user.photoURL!),
-                              child: user?.photoURL == null || user!.photoURL!.isEmpty
-                                  ? Icon(Icons.person, size: 44, color: scheme.primary)
-                                  : null,
-                            ),
-                          ),
-                          if (user != null)
-                            Positioned(
-                              right: 2,
-                              bottom: 2,
-                              child: Container(
-                                padding: const EdgeInsets.all(6),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF4CAF50),
-                                  shape: BoxShape.circle,
-                                  border: Border.all(color: const Color(0xFF1A1C2E), width: 2),
-                                ),
-                                child: const Icon(Icons.check, size: 12, color: Colors.white),
-                              ),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 20),
-                      Text(
-                        user?.displayName ?? 'Guest Mode',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 24,
-                          fontWeight: FontWeight.w800,
-                          color: Colors.white,
-                          letterSpacing: -0.5,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        user?.email ?? 'Cloud sync is disabled',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.white.withValues(alpha: 0.5),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 32),
+      body: ListView(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        children: <Widget>[
+          // ── Profile Section ────────────────────────────────────────────────
+          if (user != null)
+            _ProfileCard(
+              user: user,
+              scheme: scheme,
+              isDark: isDark,
+            )
+          else
+            _GuestCard(scheme: scheme, isDark: isDark),
+          const SizedBox(height: 28),
 
-                const _SectionHeader(label: 'CLOUD STORAGE'),
-                const SizedBox(height: 12),
-                _AccountGroup(
-                  children: [
-                    _AccountRow(
-                      icon: Icons.history_rounded,
-                      title: 'Last Synced',
-                      subtitle: sync.lastSyncedAt?.toLocal().toString().split('.').first ?? 'Never',
-                    ),
-                    _AccountDivider(),
-                    _AccountRow(
-                      icon: Icons.data_usage_rounded,
-                      title: 'Storage Usage',
-                      subtitle: _estimateStorage(),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-
-                if (user != null) ...[
-                  const _SectionHeader(label: 'ACTIONS'),
-                  const SizedBox(height: 12),
-                  _AccountGroup(
-                    children: [
-                      _ActionTile(
-                        icon: Icons.sync_rounded,
-                        label: 'Force Cloud Sync',
-                        onTap: () => sync.syncAll(messenger: ScaffoldMessenger.of(context)),
-                        isPrimary: true,
-                      ),
-                      _AccountDivider(),
-                      _ActionTile(
-                        icon: Icons.cloud_off_outlined,
-                        label: 'Clear Cloud Backup',
-                        onTap: () => _confirmClearCloudBackup(context, sync),
-                      ),
-                      _AccountDivider(),
-                      _ActionTile(
-                        icon: Icons.logout_rounded,
-                        label: 'Sign Out',
-                        onTap: () async {
-                          await auth.signOut();
-                          ref.read(guestModeProvider.notifier).state = false;
-                        },
-                        textColor: scheme.error,
-                      ),
-                    ],
-                  ),
-                ] else ...[
-                  const _SectionHeader(label: 'GET STARTED'),
-                  const SizedBox(height: 12),
-                  _AccountGroup(
-                    children: [
-                      _ActionTile(
-                        icon: Icons.g_mobiledata_rounded,
-                        label: 'Sign in with Google',
-                        onTap: () => _signInAndSync(
-                          context: context,
-                          auth: auth,
-                          sync: sync,
-                          useGoogle: true,
-                        ),
-                        isPrimary: true,
-                      ),
-                      if (supportsAppleSignIn) ...[
-                        _AccountDivider(),
-                        _ActionTile(
-                          icon: Icons.apple_rounded,
-                          label: 'Sign in with Apple',
-                          onTap: () => _signInAndSync(
-                            context: context,
-                            auth: auth,
-                            sync: sync,
-                            useGoogle: false,
-                          ),
-                        ),
-                      ],
-                      _AccountDivider(),
-                      _ActionTile(
-                        icon: Icons.email_outlined,
-                        label: 'Sign in with Email',
-                        onTap: () => _showEmailAuthDialog(
-                          context: context,
-                          auth: auth,
-                          sync: sync,
-                          createAccount: false,
-                        ),
-                      ),
-                      _AccountDivider(),
-                      _ActionTile(
-                        icon: Icons.person_add_alt_1_rounded,
-                        label: 'Create Account',
-                        onTap: () => _showEmailAuthDialog(
-                          context: context,
-                          auth: auth,
-                          sync: sync,
-                          createAccount: true,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-                
-                if (user != null) ...[
-                  const SizedBox(height: 40),
-                  Center(
-                    child: TextButton.icon(
-                      onPressed: () => _confirmDelete(context, auth),
-                      icon: const Icon(Icons.delete_outline_rounded, size: 18),
-                      label: Text(
-                        'Delete Account Permanently',
-                        style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w600),
-                      ),
-                      style: TextButton.styleFrom(foregroundColor: scheme.error.withValues(alpha: 0.8)),
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 24),
-              ],
-            ),
+          // ── Cloud Storage Info ─────────────────────────────────────────────
+          _SectionLabel(label: 'CLOUD STORAGE', scheme: scheme),
+          const SizedBox(height: 12),
+          _InfoCard(
+            icon: Icons.history_rounded,
+            label: 'Last Synced',
+            value: sync.lastSyncedAt?.toLocal().toString().split('.').first ?? 'Never',
+            scheme: scheme,
+            isDark: isDark,
           ),
+          const SizedBox(height: 8),
+          _InfoCard(
+            icon: Icons.data_usage_rounded,
+            label: 'Storage Usage',
+            value: _estimateStorage(),
+            scheme: scheme,
+            isDark: isDark,
+          ),
+          const SizedBox(height: 28),
+
+          // ── Actions Section ────────────────────────────────────────────────
+          if (user != null) ...[
+            _SectionLabel(label: 'ACTIONS', scheme: scheme),
+            const SizedBox(height: 12),
+            _SyncButton(
+              scheme: scheme,
+              isDark: isDark,
+              sync: sync,
+            ),
+            const SizedBox(height: 8),
+            _ActionButton(
+              icon: Icons.cloud_off_outlined,
+              label: 'Clear Cloud Backup',
+              onTap: () => _confirmClearCloudBackup(context, sync),
+              scheme: scheme,
+              isDark: isDark,
+            ),
+            const SizedBox(height: 8),
+            _ActionButton(
+              icon: Icons.logout_rounded,
+              label: 'Sign Out',
+              onTap: () async {
+                await auth.signOut();
+                ref.read(guestModeProvider.notifier).state = false;
+              },
+              scheme: scheme,
+              isDark: isDark,
+              isDestructive: false,
+            ),
+            const SizedBox(height: 28),
+          ] else ...[
+            // ── Sign In Options ─────────────────────────────────────────────
+            _SectionLabel(label: 'GET STARTED', scheme: scheme),
+            const SizedBox(height: 12),
+            _PrimaryActionButton(
+              icon: Icons.g_mobiledata_rounded,
+              label: 'Sign in with Google',
+              onTap: () => _signInAndSync(
+                context: context,
+                auth: auth,
+                useGoogle: true,
+              ),
+              scheme: scheme,
+              isDark: isDark,
+            ),
+            const SizedBox(height: 8),
+            if (supportsAppleSignIn) ...[
+              _ActionButton(
+                icon: Icons.apple_rounded,
+                label: 'Sign in with Apple',
+                onTap: () => _signInAndSync(
+                  context: context,
+                  auth: auth,
+                  useGoogle: false,
+                ),
+                scheme: scheme,
+                isDark: isDark,
+              ),
+              const SizedBox(height: 8),
+            ],
+            _ActionButton(
+              icon: Icons.email_outlined,
+              label: 'Sign in with Email',
+              onTap: () => _showEmailAuthDialog(
+                context: context,
+                auth: auth,
+                createAccount: false,
+              ),
+              scheme: scheme,
+              isDark: isDark,
+            ),
+            const SizedBox(height: 8),
+            _ActionButton(
+              icon: Icons.person_add_alt_1_rounded,
+              label: 'Create Account',
+              onTap: () => _showEmailAuthDialog(
+                context: context,
+                auth: auth,
+                createAccount: true,
+              ),
+              scheme: scheme,
+              isDark: isDark,
+            ),
+            const SizedBox(height: 28),
+          ],
+
+          // ── Danger Zone ─────────────────────────────────────────────────────
+          if (user != null) ...[
+            _SectionLabel(label: 'DANGER ZONE', scheme: scheme),
+            const SizedBox(height: 12),
+            _ActionButton(
+              icon: Icons.delete_outline_rounded,
+              label: 'Delete Account Permanently',
+              onTap: () => _confirmDelete(context, auth),
+              scheme: scheme,
+              isDark: isDark,
+              isDestructive: true,
+            ),
+          ],
+          const SizedBox(height: 20),
         ],
       ),
     );
@@ -290,15 +192,14 @@ class AccountScreen extends ConsumerWidget {
     }
     final double kb = bytes / 1024;
     if (kb < 1024) {
-      return '${kb.toStringAsFixed(1)} KB (estimated)';
+      return '${kb.toStringAsFixed(1)} KB';
     }
-    return '${(kb / 1024).toStringAsFixed(2)} MB (estimated)';
+    return '${(kb / 1024).toStringAsFixed(2)} MB';
   }
 
   Future<void> _signInAndSync({
     required BuildContext context,
     required AuthService auth,
-    required SyncService sync,
     required bool useGoogle,
   }) async {
     final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
@@ -316,10 +217,9 @@ class AccountScreen extends ConsumerWidget {
         return;
       }
 
-      await sync.syncAll(messenger: messenger);
       if (context.mounted) {
-        messenger.showSnackBar(
-          const SnackBar(content: Text('Signed in and backed up local data to cloud.')),
+        await Navigator.of(context).push<bool>(
+          MaterialPageRoute<bool>(builder: (_) => const RestoreDataScreen()),
         );
       }
     } catch (e) {
@@ -334,7 +234,6 @@ class AccountScreen extends ConsumerWidget {
   Future<void> _showEmailAuthDialog({
     required BuildContext context,
     required AuthService auth,
-    required SyncService sync,
     required bool createAccount,
   }) async {
     final TextEditingController emailController = TextEditingController();
@@ -415,16 +314,9 @@ class AccountScreen extends ConsumerWidget {
         await auth.signInWithEmailPassword(email: email, password: password);
       }
 
-      await sync.syncAll(messenger: messenger);
       if (context.mounted) {
-        messenger.showSnackBar(
-          SnackBar(
-            content: Text(
-              createAccount
-                  ? 'Account created and local data backed up.'
-                  : 'Signed in and local data backed up.',
-            ),
-          ),
+        await Navigator.of(context).push<bool>(
+          MaterialPageRoute<bool>(builder: (_) => const RestoreDataScreen()),
         );
       }
     } on FirebaseAuthException catch (e) {
@@ -516,89 +408,111 @@ class AccountScreen extends ConsumerWidget {
   }
 }
 
-// ── Helper Widgets ──────────────────────────────────────────────────────────
+// ── Helper Widgets ─────────────────────────────────────────────────────────
 
-class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({required this.label});
-  final String label;
+/// Profile card for authenticated users
+class _ProfileCard extends StatelessWidget {
+  const _ProfileCard({
+    required this.user,
+    required this.scheme,
+    required this.isDark,
+  });
 
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.only(left: 4),
-      child: Text(
-        label,
-        style: GoogleFonts.plusJakartaSans(
-          color: Colors.white.withValues(alpha: 0.4),
-          fontWeight: FontWeight.w800,
-          fontSize: 11,
-          letterSpacing: 1.2,
-        ),
-      ),
-    );
-  }
-}
-
-class _AccountGroup extends StatelessWidget {
-  const _AccountGroup({required this.children});
-  final List<Widget> children;
+  final User user;
+  final ColorScheme scheme;
+  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
     return Container(
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        color: isDark
+            ? scheme.surface.withValues(alpha: 0.6)
+            : Colors.white.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isDark
+              ? scheme.primary.withValues(alpha: 0.15)
+              : scheme.primary.withValues(alpha: 0.1),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: scheme.primary.withValues(alpha: isDark ? 0.1 : 0.08),
+            blurRadius: 20,
+            offset: const Offset(0, 4),
+          ),
+        ],
+        backgroundBlendMode: BlendMode.overlay,
       ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(children: children),
-    );
-  }
-}
-
-class _AccountRow extends StatelessWidget {
-  const _AccountRow({required this.icon, required this.title, required this.subtitle});
-  final IconData icon;
-  final String title;
-  final String subtitle;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.all(16),
       child: Row(
         children: [
+          // Avatar
           Container(
-            padding: const EdgeInsets.all(10),
+            padding: const EdgeInsets.all(3),
             decoration: BoxDecoration(
-              color: scheme.primary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(14),
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: scheme.primary,
+                width: 2,
+              ),
             ),
-            child: Icon(icon, size: 20, color: scheme.primary),
+            child: CircleAvatar(
+              radius: 40,
+              backgroundColor: scheme.primaryContainer,
+              backgroundImage: user.photoURL == null || user.photoURL!.isEmpty
+                  ? null
+                  : NetworkImage(user.photoURL!),
+              child: user.photoURL == null || user.photoURL!.isEmpty
+                  ? Icon(Icons.person, size: 40, color: scheme.primary)
+                  : null,
+            ),
           ),
           const SizedBox(width: 16),
+          // User info
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  title,
-                  style: GoogleFonts.plusJakartaSans(
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
-                    fontSize: 15,
+                  user.displayName ?? 'Account User',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.3,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: 4),
                 Text(
-                  subtitle,
-                  style: GoogleFonts.plusJakartaSans(
-                    color: Colors.white.withValues(alpha: 0.5),
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
+                  user.email ?? 'No email',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: scheme.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.check_circle, size: 14, color: scheme.primary),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Verified',
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: scheme.primary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -610,46 +524,249 @@ class _AccountRow extends StatelessWidget {
   }
 }
 
-class _ActionTile extends StatelessWidget {
-  const _ActionTile({
+/// Guest mode card for unauthenticated users
+class _GuestCard extends StatelessWidget {
+  const _GuestCard({
+    required this.scheme,
+    required this.isDark,
+  });
+
+  final ColorScheme scheme;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: isDark
+            ? scheme.surface.withValues(alpha: 0.5)
+            : Colors.white.withValues(alpha: 0.4),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isDark
+              ? scheme.surfaceContainerHighest.withValues(alpha: 0.2)
+              : scheme.outline.withValues(alpha: 0.12),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: scheme.secondary.withValues(alpha: isDark ? 0.08 : 0.06),
+            blurRadius: 16,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: scheme.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(Icons.person_outline, size: 28, color: scheme.primary),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Guest Mode',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Sign in to sync your data across devices',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Section label for grouping content
+class _SectionLabel extends StatelessWidget {
+  const _SectionLabel({
+    required this.label,
+    required this.scheme,
+  });
+
+  final String label;
+  final ColorScheme scheme;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+          color: scheme.onSurfaceVariant,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 1.0,
+        ),
+      ),
+    );
+  }
+}
+
+/// Information card showing storage and sync info
+class _InfoCard extends StatelessWidget {
+  const _InfoCard({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.scheme,
+    required this.isDark,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final ColorScheme scheme;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark
+            ? scheme.surface.withValues(alpha: 0.45)
+            : Colors.white.withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDark
+              ? scheme.outline.withValues(alpha: 0.15)
+              : scheme.outline.withValues(alpha: 0.1),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: scheme.primary.withValues(alpha: isDark ? 0.05 : 0.03),
+            blurRadius: 12,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: scheme.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, size: 20, color: scheme.primary),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: scheme.onSurface,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Primary action button (usually for important actions)
+class _PrimaryActionButton extends StatefulWidget {
+  const _PrimaryActionButton({
     required this.icon,
     required this.label,
     required this.onTap,
-    this.isPrimary = false,
-    this.textColor,
+    required this.scheme,
+    required this.isDark,
   });
 
   final IconData icon;
   final String label;
   final VoidCallback onTap;
-  final bool isPrimary;
-  final Color? textColor;
+  final ColorScheme scheme;
+  final bool isDark;
+
+  @override
+  State<_PrimaryActionButton> createState() => _PrimaryActionButtonState();
+}
+
+class _PrimaryActionButtonState extends State<_PrimaryActionButton> {
+  bool _isPressed = false;
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _isPressed = true),
+      onTapUp: (_) {
+        setState(() => _isPressed = false);
+        widget.onTap();
+      },
+      onTapCancel: () => setState(() => _isPressed = false),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        decoration: BoxDecoration(
+          color: widget.scheme.primary,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: _isPressed
+              ? [
+                  BoxShadow(
+                    color: widget.scheme.primary.withValues(alpha: 0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : [
+                  BoxShadow(
+                    color: widget.scheme.primary.withValues(alpha: 0.15),
+                    blurRadius: 16,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+        ),
         child: Row(
           children: [
-            Icon(
-              icon,
-              size: 22,
-              color: textColor ?? (isPrimary ? scheme.primary : Colors.white.withValues(alpha: 0.7)),
-            ),
-            const SizedBox(width: 16),
-            Text(
-              label,
-              style: GoogleFonts.plusJakartaSans(
-                fontWeight: isPrimary ? FontWeight.w800 : FontWeight.w600,
-                color: textColor ?? (isPrimary ? scheme.primary : Colors.white),
-                fontSize: 15,
+            Icon(widget.icon, size: 22, color: widget.scheme.onPrimary),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Text(
+                widget.label,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: widget.scheme.onPrimary,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.2,
+                ),
               ),
             ),
-            const Spacer(),
-            Icon(Icons.chevron_right_rounded, size: 20, color: Colors.white.withValues(alpha: 0.2)),
+            Icon(Icons.arrow_forward_rounded, size: 20, color: widget.scheme.onPrimary),
           ],
         ),
       ),
@@ -657,15 +774,225 @@ class _ActionTile extends StatelessWidget {
   }
 }
 
-class _AccountDivider extends StatelessWidget {
-  const _AccountDivider({super.key});
+/// Secondary action button
+class _ActionButton extends StatefulWidget {
+  const _ActionButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    required this.scheme,
+    required this.isDark,
+    this.isDestructive = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final ColorScheme scheme;
+  final bool isDark;
+  final bool isDestructive;
+
+  @override
+  State<_ActionButton> createState() => _ActionButtonState();
+}
+
+class _ActionButtonState extends State<_ActionButton> {
+  bool _isPressed = false;
+
   @override
   Widget build(BuildContext context) {
-    return Divider(
-      height: 1,
-      indent: 60,
-      color: Colors.white.withValues(alpha: 0.05),
+    final Color fgColor = widget.isDestructive
+        ? widget.scheme.error
+        : widget.scheme.onSurface;
+
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _isPressed = true),
+      onTapUp: (_) {
+        setState(() => _isPressed = false);
+        widget.onTap();
+      },
+      onTapCancel: () => setState(() => _isPressed = false),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: widget.isDark
+              ? widget.scheme.surface.withValues(alpha: 0.5)
+              : Colors.white.withValues(alpha: 0.5),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: widget.isDestructive
+                ? widget.scheme.error.withValues(alpha: 0.2)
+                : widget.scheme.primary.withValues(alpha: 0.15),
+            width: 1.5,
+          ),
+          boxShadow: _isPressed
+              ? [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.08),
+                    blurRadius: 4,
+                  ),
+                ]
+              : [
+                  BoxShadow(
+                    color: (widget.isDestructive ? widget.scheme.error : widget.scheme.primary)
+                        .withValues(alpha: widget.isDark ? 0.04 : 0.03),
+                    blurRadius: 10,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+        ),
+        child: Row(
+          children: [
+            Icon(widget.icon, size: 22, color: fgColor),
+            const SizedBox(width: 14),
+            Text(
+              widget.label,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: fgColor,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const Spacer(),
+            Icon(Icons.arrow_forward_rounded, size: 20, color: fgColor.withValues(alpha: 0.5)),
+          ],
+        ),
+      ),
     );
   }
 }
 
+/// Sync button with progress bar and animated sync logo
+class _SyncButton extends StatefulWidget {
+  const _SyncButton({
+    required this.scheme,
+    required this.isDark,
+    required this.sync,
+  });
+
+  final ColorScheme scheme;
+  final bool isDark;
+  final SyncService sync;
+
+  @override
+  State<_SyncButton> createState() => _SyncButtonState();
+}
+
+class _SyncButtonState extends State<_SyncButton> with SingleTickerProviderStateMixin {
+  late AnimationController _rotationController;
+  bool _isSyncing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _rotationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    );
+  }
+
+  @override
+  void dispose() {
+    _rotationController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _startSync() async {
+    if (_isSyncing) return;
+
+    setState(() => _isSyncing = true);
+    _rotationController.repeat();
+
+    try {
+      // Sync without messenger to disable snackbar notifications
+      await widget.sync.syncAll(messenger: null);
+    } finally {
+      if (mounted) {
+        _rotationController.stop();
+        setState(() => _isSyncing = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: _isSyncing ? null : _startSync,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: widget.isDark
+              ? widget.scheme.surface.withValues(alpha: 0.5)
+              : Colors.white.withValues(alpha: 0.5),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: _isSyncing
+                ? widget.scheme.primary
+                : widget.scheme.primary.withValues(alpha: 0.15),
+            width: 1.5,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: widget.scheme.primary
+                  .withValues(alpha: widget.isDark ? 0.04 : 0.03),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                // Animated sync icon
+                RotationTransition(
+                  turns: _rotationController,
+                  child: Icon(
+                    Icons.sync_rounded,
+                    size: 22,
+                    color: _isSyncing
+                        ? widget.scheme.primary
+                        : widget.scheme.onSurface,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Text(
+                    _isSyncing ? 'Syncing...' : 'Force Cloud Sync',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          color: _isSyncing
+                              ? widget.scheme.primary
+                              : widget.scheme.onSurface,
+                          fontWeight: FontWeight.w600,
+                        ),
+                  ),
+                ),
+                const Spacer(),
+                Icon(
+                  Icons.arrow_forward_rounded,
+                  size: 20,
+                  color: widget.scheme.onSurface
+                      .withValues(alpha: _isSyncing ? 0.3 : 0.5),
+                ),
+              ],
+            ),
+            // Progress bar
+            if (_isSyncing) ...[
+              const SizedBox(height: 12),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: LinearProgressIndicator(
+                  minHeight: 4,
+                  backgroundColor:
+                      widget.scheme.primary.withValues(alpha: 0.1),
+                  color: widget.scheme.primary,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}

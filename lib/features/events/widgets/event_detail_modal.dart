@@ -68,14 +68,9 @@ class _EventDetailModalState extends ConsumerState<EventDetailModal> {
                     ),
                     tooltip: event.isPinned ? 'Unpin' : 'Pin to top',
                     onPressed: () async {
-                      final messenger = ScaffoldMessenger.of(context);
                       await ref
                           .read(eventsProvider.notifier)
                           .togglePinned(event);
-                      messenger.showSnackBar(SnackBar(
-                        content: Text(
-                            event.isPinned ? 'Removed from pinned' : 'Pinned!'),
-                      ));
                     },
                   ),
                   IconButton(
