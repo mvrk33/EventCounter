@@ -1,5 +1,7 @@
+import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
 import '../models/event_model.dart';
@@ -34,11 +36,15 @@ class EventCardPolished extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
     final scheme = Theme.of(context).colorScheme;
     final userContext = ref.watch(userContextProvider);
     final isStressed = userContext.stressLevel == UserStressLevel.high;
     final int value = DateHelpers.eventCountValue(event);
-    final String compactDescription = DateHelpers.eventCountCompactDescription(event);
+    final breakdown = DateHelpers.breakdownBetween(
+      event.mode == EventMode.countdown ? DateTime.now() : event.date,
+      event.mode == EventMode.countdown ? event.date : DateTime.now(),
+    );
     final EventCardStyle style = EventCardStyleResolver.resolve(event, Theme.of(context).brightness);
     final Color accent = style.accent;
 
@@ -60,68 +66,107 @@ class EventCardPolished extends ConsumerWidget {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: <Color>[
-              style.surfaceTop.withValues(alpha: 0.95),
-              style.surfaceBottom.withValues(alpha: 0.92),
+              style.surfaceTop.withValues(alpha: isDark ? 0.4 : 0.6),
+              style.surfaceBottom.withValues(alpha: isDark ? 0.2 : 0.4),
             ],
           ),
           border: Border.all(
-            color: style.border.withValues(alpha: 0.25),
-            width: 1.5,
+            color: Colors.white.withValues(alpha: isDark ? 0.2 : 0.4),
+            width: 1.2,
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.2),
-              blurRadius: 15,
-              offset: const Offset(0, 8),
+              color: Colors.black.withValues(alpha: 0.15),
+              blurRadius: 12,
+              offset: const Offset(0, 6),
             ),
+            // Light highlight for 3D depth
             BoxShadow(
-              color: style.accent.withValues(alpha: 0.05),
-              blurRadius: 30,
-              spreadRadius: -5,
+              color: Colors.white.withValues(alpha: isDark ? 0.05 : 0.2),
+              blurRadius: 0,
+              offset: const Offset(-1, -1),
+              spreadRadius: 0,
             ),
           ],
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(24),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(24),
-              onTap: () {
-                ref.read(userContextProvider.notifier).recordInteraction();
-                onTap();
-              },
-              splashColor: accent.withValues(alpha: 0.1),
-              highlightColor: accent.withValues(alpha: 0.05),
-              child: Stack(
-                children: <Widget>[
-                  // Subtle inner glow
-                  Positioned(
-                    top: -40,
-                    left: -40,
-                    child: Container(
-                      width: 120,
-                      height: 120,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: accent.withValues(alpha: 0.08),
-                        // Removed invalid 'filter' property. If blur is needed, use BackdropFilter.
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(24),
+                onTap: () {
+                  ref.read(userContextProvider.notifier).recordInteraction();
+                  onTap();
+                },
+                splashColor: accent.withValues(alpha: 0.1),
+                highlightColor: accent.withValues(alpha: 0.05),
+                child: Stack(
+                  children: <Widget>[
+                    // Subtle inner glow
+                    Positioned(
+                      top: -40,
+                      left: -40,
+                      child: Container(
+                        width: 120,
+                        height: 120,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: accent.withValues(alpha: 0.12),
+                        ),
                       ),
                     ),
-                  ),
-                  if (event.visualTheme != null && !isStressed)
-                    Positioned.fill(
-                      child: _buildVisualThemeLayer(event.visualTheme!, accent),
+                    // Sprinkles of colors for gloss/depth
+                    Positioned(
+                      top: 20,
+                      right: 40,
+                      child: _buildSprinkle(accent, 8, 0.15),
                     ),
-                  Padding(
-                    padding: contentPadding,
-                    child: isComfortable
-                        ? _buildComfortableLayout(
-                            context, style, value, compactDescription, scheme)
-                        : _buildCompactLayout(
-                            context, style, value, compactDescription, scheme),
-                  ),
-                ],
+                    Positioned(
+                      bottom: 30,
+                      left: 60,
+                      child: _buildSprinkle(accent.withValues(alpha: 0.5), 6, 0.1),
+                    ),
+                    Positioned(
+                      top: 50,
+                      left: 120,
+                      child: _buildSprinkle(Colors.white, 4, 0.1),
+                    ),
+                    // Glossy highlight reflection
+                    Positioned(
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      child: Container(
+                        height: 40,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.white.withValues(alpha: isDark ? 0.08 : 0.15),
+                              Colors.white.withValues(alpha: 0),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    if (event.visualTheme != null && !isStressed)
+                      Positioned.fill(
+                        child: _buildVisualThemeLayer(event.visualTheme!, accent),
+                      ),
+                    Padding(
+                      padding: contentPadding,
+                      child: isComfortable
+                          ? _buildComfortableLayout(
+                              context, style, value, breakdown, scheme)
+                          : _buildCompactLayout(
+                              context, style, value, breakdown, scheme),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -156,9 +201,10 @@ class EventCardPolished extends ConsumerWidget {
     BuildContext context,
     EventCardStyle style,
     int value,
-    String compactDescription,
+    DateBreakdown breakdown,
     ColorScheme scheme,
   ) {
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
     final Color accent = style.accent;
     final DateTime now = DateTime.now();
     final DateTime today = DateTime(now.year, now.month, now.day);
@@ -177,21 +223,33 @@ class EventCardPolished extends ConsumerWidget {
               height: 72,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                gradient: RadialGradient(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                   colors: [
-                    accent.withValues(alpha: 0.25),
-                    accent.withValues(alpha: 0.05),
+                    isDark ? Colors.white.withValues(alpha: 0.22) : accent.withValues(alpha: 0.15),
+                    isDark ? Colors.white.withValues(alpha: 0.04) : accent.withValues(alpha: 0.04),
                   ],
                 ),
                 border: Border.all(
-                  color: accent.withValues(alpha: 0.3),
-                  width: 2,
+                  color: isDark ? Colors.white.withValues(alpha: 0.25) : accent.withValues(alpha: 0.3),
+                  width: 1.5,
                 ),
+                boxShadow: isDark ? [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.3),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ] : null,
               ),
             ),
             Text(
               event.emoji,
-              style: const TextStyle(fontSize: 34),
+              style: const TextStyle(
+                fontSize: 36,
+                height: 1.1,
+              ),
             ),
           ],
         ),
@@ -206,7 +264,7 @@ class EventCardPolished extends ConsumerWidget {
                 event.title,
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.w800,
-                      color: Colors.white.withValues(alpha: 0.95),
+                      color: isDark ? Colors.white.withValues(alpha: 0.95) : Colors.black.withValues(alpha: 0.8),
                       letterSpacing: -0.5,
                       height: 1.1,
                     ),
@@ -216,15 +274,22 @@ class EventCardPolished extends ConsumerWidget {
               const SizedBox(height: 6),
               Row(
                 children: [
-                  _buildSmallPill(context, Icons.folder_rounded, event.category, accent),
-                  const SizedBox(width: 8),
+                  Text(
+                    '${breakdown.years}y ${breakdown.months}m ${breakdown.days}d',
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: accent.withValues(alpha: 0.9),
+                          fontWeight: FontWeight.w800,
+                        ),
+                  ),
+                  const Spacer(),
                   Text(
                     _formatEventDate(event),
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: Colors.white.withValues(alpha: 0.5),
+                          color: isDark ? Colors.white.withValues(alpha: 0.5) : Colors.black.withValues(alpha: 0.4),
                           fontWeight: FontWeight.w600,
                         ),
                   ),
+                  const SizedBox(width: 8),
                 ],
               ),
               const SizedBox(height: 12),
@@ -264,7 +329,7 @@ class EventCardPolished extends ConsumerWidget {
                 ),
           ),
           Text(
-            isUpcoming ? 'DAYS' : 'AGO',
+            isUpcoming ? event.countUnit.name.toUpperCase() : 'AGO',
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
                   fontSize: 8,
                   fontWeight: FontWeight.w800,
@@ -281,138 +346,156 @@ class EventCardPolished extends ConsumerWidget {
     BuildContext context,
     EventCardStyle style,
     int value,
-    String compactDescription,
+    DateBreakdown breakdown,
     ColorScheme scheme,
   ) {
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
     final Color accent = style.accent;
     final DateTime now = DateTime.now();
     final DateTime today = DateTime(now.year, now.month, now.day);
     final DateTime nextDate = DateTime(event.nextOccurrenceDate.year, event.nextOccurrenceDate.month, event.nextOccurrenceDate.day);
     final bool isUpcoming = !nextDate.isBefore(today);
 
-    return IntrinsicHeight(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: <Widget>[
-          // ── Minimal Side Pillar ──────────────────────────────────
-          Container(
-            width: 48,
-            decoration: BoxDecoration(
-              color: accent.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: accent.withValues(alpha: 0.18),
-                width: 1.5,
-              ),
-            ),
-            child: Center(
-              child: Text(
-                event.emoji,
-                style: const TextStyle(fontSize: 22),
-              ),
-            ),
-          ),
-          const SizedBox(width: 14),
-          // ── Content Section ──────────────────────────────────
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: <Widget>[
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        event.title,
-                        style: GoogleFonts.plusJakartaSans(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 15,
-                          color: Colors.white.withValues(alpha: 0.95),
-                          letterSpacing: -0.3,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    if (event.isPinned)
-                      Padding(
-                        padding: const EdgeInsets.only(left: 6),
-                        child: Icon(
-                          Icons.push_pin_rounded,
-                          size: 11,
-                          color: accent.withValues(alpha: 0.6),
-                        ),
-                      ),
+    final String unitChar = event.countUnit == EventCountUnit.days
+        ? 'D'
+        : event.countUnit == EventCountUnit.months
+            ? 'M'
+            : 'Y';
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: <Widget>[
+        // ── Minimal Side Pillar ──────────────────────────────────
+        Stack(
+          alignment: Alignment.center,
+          children: [
+            Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    isDark ? Colors.white.withValues(alpha: 0.22) : accent.withValues(alpha: 0.15),
+                    isDark ? Colors.white.withValues(alpha: 0.04) : accent.withValues(alpha: 0.04),
                   ],
                 ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Text(
-                      event.category.toUpperCase(),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: isDark ? Colors.white.withValues(alpha: 0.25) : accent.withValues(alpha: 0.3),
+                  width: 1.5,
+                ),
+                boxShadow: isDark ? [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.25),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ] : null,
+              ),
+            ),
+            Text(
+              event.emoji,
+              style: const TextStyle(
+                fontSize: 26,
+                height: 1.1,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(width: 14),
+        // ── Content Section ──────────────────────────────────
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: <Widget>[
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      event.title,
                       style: GoogleFonts.plusJakartaSans(
-                        fontSize: 9,
-                        fontWeight: FontWeight.w900,
-                        color: accent.withValues(alpha: 0.7),
-                        letterSpacing: 0.8,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 15,
+                        color: isDark ? Colors.white.withValues(alpha: 0.95) : Colors.black.withValues(alpha: 0.8),
+                        letterSpacing: -0.3,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  if (event.isPinned)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 6),
+                      child: Icon(
+                        Icons.push_pin_rounded,
+                        size: 11,
+                        color: accent.withValues(alpha: 0.6),
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    Container(
-                      width: 2,
-                      height: 2,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Colors.white.withValues(alpha: 0.2),
-                      ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  _buildNextOccurrenceInfoCompact(context, scheme, style),
+                  const Spacer(),
+                  Text(
+                    '${breakdown.years}y ${breakdown.months}m ${breakdown.days}d',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      color: accent.withValues(alpha: 0.8),
+                      letterSpacing: 0.3,
                     ),
-                    const SizedBox(width: 8),
-                    _buildNextOccurrenceInfoCompact(context, scheme, style),
-                  ],
+                  ),
+                  const SizedBox(width: 4),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 12),
+        // ── Integrated Count Pill ──────────────────────────────────
+        Center(
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.05),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.1),
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '$value',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 14,
+                    color: accent,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  isUpcoming ? unitChar : 'AGO',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 8,
+                    color: isDark ? Colors.white.withValues(alpha: 0.4) : Colors.black.withValues(alpha: 0.3),
+                  ),
                 ),
               ],
             ),
           ),
-          const SizedBox(width: 12),
-          // ── Integrated Count Pill ──────────────────────────────────
-          Center(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.05),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.1),
-                ),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    '$value',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontWeight: FontWeight.w900,
-                      fontSize: 14,
-                      color: accent,
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    isUpcoming ? 'D' : 'AGO',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 8,
-                      color: Colors.white.withValues(alpha: 0.4),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(width: 4),
-          _buildMenuButton(context),
-        ],
-      ),
+        ),
+        const SizedBox(width: 4),
+        _buildMenuButton(context),
+      ],
     );
   }
 
@@ -473,87 +556,6 @@ class EventCardPolished extends ConsumerWidget {
     );
   }
 
-  Widget _buildActionButtonsComfortable(
-    BuildContext context,
-    EventCardStyle style,
-  ) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        // Share button
-        Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: onShare,
-            borderRadius: BorderRadius.circular(12),
-            splashColor: style.accent.withValues(alpha: 0.1),
-            highlightColor: style.accent.withValues(alpha: 0.05),
-            child: Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
-                color: style.accent.withValues(alpha: 0.12),
-                border: Border.all(
-                  color: style.accent.withValues(alpha: 0.18),
-                  width: 1.2,
-                ),
-              ),
-              child: Icon(
-                Icons.ios_share_rounded,
-                size: 20,
-                color: style.accent.withValues(alpha: 0.85),
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(width: 10),
-        // Menu button
-        _buildMenuButton(context),
-      ],
-    );
-  }
-
-  Widget _buildActionButtonsCompact(
-    BuildContext context,
-    EventCardStyle style,
-  ) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        // Share button
-        Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: onShare,
-            borderRadius: BorderRadius.circular(10),
-            splashColor: style.accent.withValues(alpha: 0.1),
-            highlightColor: style.accent.withValues(alpha: 0.04),
-            child: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(10),
-                color: style.accent.withValues(alpha: 0.1),
-                border: Border.all(
-                  color: style.accent.withValues(alpha: 0.14),
-                  width: 0.9,
-                ),
-              ),
-              child: Icon(
-                Icons.ios_share_rounded,
-                size: 16,
-                color: style.accent.withValues(alpha: 0.8),
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(width: 6),
-        // Menu button
-        _buildMenuButton(context),
-      ],
-    );
-  }
-
-
   Widget _buildNextOccurrenceInfoComfortable(
     BuildContext context,
     ColorScheme scheme,
@@ -570,8 +572,8 @@ class EventCardPolished extends ConsumerWidget {
     final int daysUntil = DateHelpers.daysBetween(now, nextOccurrence).abs();
 
     String info;
-    IconData? icon;
-    Color? statusColor;
+    IconData icon;
+    Color statusColor;
     Color bgColor;
 
     if (nextDate.isBefore(today)) {
@@ -607,9 +609,8 @@ class EventCardPolished extends ConsumerWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (icon != null)
-            Icon(icon, size: 18, color: statusColor),
-          if (icon != null) const SizedBox(width: 10),
+          Icon(icon, size: 18, color: statusColor),
+          const SizedBox(width: 10),
           Text(
             info,
             style: Theme.of(context).textTheme.labelMedium?.copyWith(
@@ -641,7 +642,7 @@ class EventCardPolished extends ConsumerWidget {
     final int daysUntil = DateHelpers.daysBetween(now, nextOccurrence).abs();
 
     String info;
-    Color? statusColor;
+    Color statusColor;
 
     if (nextDate.isBefore(today)) {
       // Past event, show days since
@@ -703,6 +704,24 @@ class EventCardPolished extends ConsumerWidget {
                   color: accent.withValues(alpha: 0.8),
                   fontWeight: FontWeight.w700,
                 ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSprinkle(Color color, double size, double opacity) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: color.withValues(alpha: opacity),
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: opacity),
+            blurRadius: size * 2,
+            spreadRadius: size,
           ),
         ],
       ),

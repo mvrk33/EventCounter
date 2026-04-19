@@ -258,6 +258,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final userContext = ref.watch(userContextProvider);
     final isStressed = userContext.stressLevel == UserStressLevel.high;
 
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -270,7 +271,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 12,
                   fontWeight: FontWeight.w900,
-                  color: Colors.white.withValues(alpha: 0.4),
+                  color: isDark ? Colors.white.withValues(alpha: 0.4) : Colors.black.withValues(alpha: 0.3),
                   letterSpacing: 2.0,
                 ),
               ),
@@ -305,6 +306,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Widget _buildInsightPageIndicator(int count) {
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
     return Row(
       children: List.generate(
         count,
@@ -314,7 +316,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           margin: const EdgeInsets.only(left: 4),
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: Colors.white.withValues(alpha: index == 0 ? 0.6 : 0.2),
+            color: (isDark ? Colors.white : Colors.black).withValues(alpha: index == 0 ? 0.6 : 0.2),
           ),
         ),
       ),
@@ -520,28 +522,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ),
               ),
               _buildLiveClock(context),
-            ],
-          ),
-          const SizedBox(height: 32),
-          Row(
-            children: [
-              Expanded(
-                child: _StatCard(
-                  title: 'UPCOMING',
-                  value: '$thisWeekCount',
-                  icon: Icons.calendar_today_rounded,
-                  color: const Color(0xFF6366F1),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: _StatCard(
-                  title: 'STREAK',
-                  value: '$habitCount',
-                  icon: Icons.local_fire_department_rounded,
-                  color: const Color(0xFFF59E0B),
-                ),
-              ),
             ],
           ),
         ],
@@ -977,6 +957,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Widget _sectionHeader(BuildContext context, String title, int count) {
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
     return SliverToBoxAdapter(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(20, 32, 20, 12),
@@ -994,7 +975,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             Text(
               title,
               style: GoogleFonts.plusJakartaSans(
-                color: Colors.white.withValues(alpha: 0.4),
+                color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.4),
                 fontWeight: FontWeight.w900,
                 fontSize: 11,
                 letterSpacing: 2.0,
@@ -1004,7 +985,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             Text(
               '$count',
               style: GoogleFonts.plusJakartaSans(
-                color: Colors.white.withValues(alpha: 0.2),
+                color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.2),
                 fontWeight: FontWeight.w800,
                 fontSize: 12,
               ),
@@ -1151,22 +1132,25 @@ class _DashboardTag extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
+    final Color contentColor = isDark ? Colors.white : Colors.black;
+    
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.15),
+        color: contentColor.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.1), width: 1),
+        border: Border.all(color: contentColor.withValues(alpha: 0.1), width: 1),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: Colors.white, size: 12),
+          Icon(icon, color: contentColor.withValues(alpha: 0.8), size: 12),
           const SizedBox(width: 6),
           Text(
             label,
             style: GoogleFonts.plusJakartaSans(
-              color: Colors.white,
+              color: contentColor.withValues(alpha: 0.8),
               fontSize: 10,
               fontWeight: FontWeight.w800,
               letterSpacing: 1.0,
@@ -1178,64 +1162,6 @@ class _DashboardTag extends StatelessWidget {
   }
 }
 
-class _StatCard extends StatelessWidget {
-  const _StatCard({
-    required this.title,
-    required this.value,
-    required this.icon,
-    required this.color,
-  });
-
-  final String title;
-  final String value;
-  final IconData icon;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(
-          color: color.withValues(alpha: 0.12),
-          width: 2,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                value,
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 32,
-                  fontWeight: FontWeight.w900,
-                  color: color,
-                  height: 1.0,
-                ),
-              ),
-              Icon(icon, color: color.withValues(alpha: 0.5), size: 20),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            title,
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 11,
-              fontWeight: FontWeight.w800,
-              color: color.withValues(alpha: 0.6),
-              letterSpacing: 1.0,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 
 enum _EventSort {
@@ -1629,6 +1555,8 @@ class _GlassInsightCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final userContext = ref.watch(userContextProvider);
     final isStressed = userContext.stressLevel == UserStressLevel.high;
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
+    final Color contentColor = isDark ? Colors.white : Colors.black;
 
     return GestureDetector(
       onTap: onTap,
@@ -1638,7 +1566,7 @@ class _GlassInsightCard extends ConsumerWidget {
           borderRadius: BorderRadius.circular(32),
           boxShadow: [
             BoxShadow(
-              color: insight.gradient.first.withValues(alpha: 0.15),
+              color: insight.gradient.first.withValues(alpha: isDark ? 0.15 : 0.08),
               blurRadius: 20,
               offset: const Offset(0, 10),
             ),
@@ -1647,7 +1575,9 @@ class _GlassInsightCard extends ConsumerWidget {
         child: LiquidGlassContainer(
           borderRadius: 32,
           blur: isStressed ? 25 : 18,
-          opacity: isStressed ? 0.12 : 0.08,
+          opacity: isDark 
+              ? (isStressed ? 0.12 : 0.08)
+              : (isStressed ? 0.18 : 0.12),
           color: insight.gradient.first,
           child: Stack(
             children: [
@@ -1662,8 +1592,8 @@ class _GlassInsightCard extends ConsumerWidget {
                     shape: BoxShape.circle,
                     gradient: RadialGradient(
                       colors: [
-                        Colors.white.withValues(alpha: 0.1),
-                        Colors.white.withValues(alpha: 0),
+                        contentColor.withValues(alpha: 0.1),
+                        contentColor.withValues(alpha: 0),
                       ],
                     ),
                   ),
@@ -1677,7 +1607,7 @@ class _GlassInsightCard extends ConsumerWidget {
                     insight.backgroundEmoji!,
                     style: TextStyle(
                       fontSize: compact ? 80 : 110,
-                      color: Colors.white.withValues(alpha: 0.06),
+                      color: contentColor.withValues(alpha: 0.06),
                     ),
                   ),
                 ),
@@ -1691,7 +1621,7 @@ class _GlassInsightCard extends ConsumerWidget {
                     Text(
                       insight.title,
                       style: GoogleFonts.plusJakartaSans(
-                        color: Colors.white.withValues(alpha: 0.95),
+                        color: contentColor.withValues(alpha: 0.95),
                         fontSize: compact ? 22 : 26,
                         fontWeight: FontWeight.w800,
                         letterSpacing: -1.0,
@@ -1707,7 +1637,7 @@ class _GlassInsightCard extends ConsumerWidget {
                           child: Text(
                             insight.subtitle,
                             style: GoogleFonts.plusJakartaSans(
-                              color: Colors.white.withValues(alpha: 0.5),
+                              color: contentColor.withValues(alpha: 0.5),
                               fontSize: compact ? 12 : 14,
                               fontWeight: FontWeight.w600,
                             ),
@@ -1718,7 +1648,7 @@ class _GlassInsightCard extends ConsumerWidget {
                         Icon(
                           Icons.arrow_forward_rounded,
                           size: 16,
-                          color: Colors.white.withValues(alpha: 0.3),
+                          color: contentColor.withValues(alpha: 0.3),
                         ),
                       ],
                     ),
