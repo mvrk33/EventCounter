@@ -407,7 +407,15 @@ class _FeatureBullet extends StatelessWidget {
             color: Colors.white.withValues(alpha: 0.10),
             borderRadius: BorderRadius.circular(10),
           ),
-          child: Center(child: Text(emoji, style: const TextStyle(fontSize: 15))),
+          child: Center(
+            child: Text(
+              emoji,
+              style: const TextStyle(
+                fontSize: 15,
+                fontFamily: 'sans-serif',
+              ),
+            ),
+          ),
         ),
         const SizedBox(width: 12),
         Text(

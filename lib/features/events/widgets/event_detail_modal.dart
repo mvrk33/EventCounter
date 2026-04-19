@@ -109,10 +109,14 @@ class _EventDetailModalState extends ConsumerState<EventDetailModal> {
                             right: -12,
                             bottom: -16,
                             child: Opacity(
-                              opacity: 0.13,
+                              opacity: 0.15,
                               child: Text(
                                 event.emoji,
-                                style: const TextStyle(fontSize: 110),
+                                style: const TextStyle(
+                                  fontSize: 110,
+                                  fontFamily: 'sans-serif',
+                                  color: Colors.white,
+                                ),
                               ),
                             ),
                           ),
@@ -136,7 +140,11 @@ class _EventDetailModalState extends ConsumerState<EventDetailModal> {
                                       child: Center(
                                         child: Text(
                                           event.emoji,
-                                          style: const TextStyle(fontSize: 30),
+                                          style: const TextStyle(
+                                            fontSize: 30,
+                                            fontFamily: 'sans-serif',
+                                            color: Colors.white,
+                                          ),
                                         ),
                                       ),
                                     ),

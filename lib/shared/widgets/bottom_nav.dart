@@ -18,67 +18,69 @@ class BottomNav extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bottom = MediaQuery.of(context).padding.bottom;
 
-    return Container(
-      padding: EdgeInsets.fromLTRB(20, 0, 20, bottom > 0 ? bottom : 20),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(36),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
-          child: Container(
-            height: 76,
-            decoration: BoxDecoration(
-              color: isDark
-                  ? const Color(0xFF1A1B28).withValues(alpha: 0.85)
-                  : Colors.white.withValues(alpha: 0.88),
-              borderRadius: BorderRadius.circular(36),
-              border: Border.all(
-                color: scheme.primary.withValues(alpha: 0.12),
-                width: 1.5,
+    return RepaintBoundary(
+      child: Container(
+        padding: EdgeInsets.fromLTRB(20, 0, 20, bottom > 0 ? bottom : 20),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(36),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10), // REDUCED: from 30, 30 for performance
+            child: Container(
+              height: 76,
+              decoration: BoxDecoration(
+                color: isDark
+                    ? const Color(0xFF1A1B28).withValues(alpha: 0.85)
+                    : Colors.white.withValues(alpha: 0.88),
+                borderRadius: BorderRadius.circular(36),
+                border: Border.all(
+                  color: scheme.primary.withValues(alpha: 0.12),
+                  width: 1.5,
+                ),
+                boxShadow: <BoxShadow>[
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: isDark ? 0.5 : 0.08),
+                    blurRadius: 40,
+                    offset: const Offset(0, 12),
+                  ),
+                ],
               ),
-              boxShadow: <BoxShadow>[
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: isDark ? 0.5 : 0.08),
-                  blurRadius: 40,
-                  offset: const Offset(0, 12),
-                ),
-              ],
-            ),
-            child: Row(
-              children: <Widget>[
-                _NavItem(
-                  icon: Icons.grid_view_outlined,
-                  selectedIcon: Icons.grid_view_rounded,
-                  label: 'Board',
-                  index: 0,
-                  currentIndex: currentIndex,
-                  onTap: onTap,
-                ),
-                _NavItem(
-                  icon: Icons.local_fire_department_outlined,
-                  selectedIcon: Icons.local_fire_department_rounded,
-                  label: 'Streaks',
-                  index: 1,
-                  currentIndex: currentIndex,
-                  onTap: onTap,
-                ),
-                _CenterButton(onTap: () => onTap(2)),
-                _NavItem(
-                  icon: Icons.notifications_none_rounded,
-                  selectedIcon: Icons.notifications_rounded,
-                  label: 'Inbox',
-                  index: 3,
-                  currentIndex: currentIndex,
-                  onTap: onTap,
-                ),
-                _NavItem(
-                  icon: Icons.person_outline_rounded,
-                  selectedIcon: Icons.person_rounded,
-                  label: 'Profile',
-                  index: 4,
-                  currentIndex: currentIndex,
-                  onTap: onTap,
-                ),
-              ],
+              child: Row(
+                children: <Widget>[
+                  _NavItem(
+                    icon: Icons.grid_view_outlined,
+                    selectedIcon: Icons.grid_view_rounded,
+                    label: 'Board',
+                    index: 0,
+                    currentIndex: currentIndex,
+                    onTap: onTap,
+                  ),
+                  _NavItem(
+                    icon: Icons.local_fire_department_outlined,
+                    selectedIcon: Icons.local_fire_department_rounded,
+                    label: 'Streaks',
+                    index: 1,
+                    currentIndex: currentIndex,
+                    onTap: onTap,
+                  ),
+                  _CenterButton(onTap: () => onTap(2)),
+                  _NavItem(
+                    icon: Icons.notifications_none_rounded,
+                    selectedIcon: Icons.notifications_rounded,
+                    label: 'Inbox',
+                    index: 3,
+                    currentIndex: currentIndex,
+                    onTap: onTap,
+                  ),
+                  _NavItem(
+                    icon: Icons.person_outline_rounded,
+                    selectedIcon: Icons.person_rounded,
+                    label: 'Profile',
+                    index: 4,
+                    currentIndex: currentIndex,
+                    onTap: onTap,
+                  ),
+                ],
+              ),
             ),
           ),
         ),

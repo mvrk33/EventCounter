@@ -410,10 +410,18 @@ class _WidgetConfigScreenState extends ConsumerState<WidgetConfigScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
             if (_showEmoji)
-              Text('🗓️',
-                  style: TextStyle(
-                      fontSize: 36,
-                      color: _transparent ? scheme.onSurface : _textColor)),
+              Text(
+                '🗓️',
+                style: TextStyle(
+                  fontSize: 36,
+                  fontFamily: 'sans-serif',
+                  color: _transparent
+                      ? scheme.onSurface
+                      : (ThemeData.estimateBrightnessForColor(_bgColor) == Brightness.dark
+                          ? Colors.white
+                          : Colors.black87),
+                ),
+              ),
             Text(
               '7',
               style: GoogleFonts.nunito(

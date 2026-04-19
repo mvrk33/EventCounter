@@ -255,8 +255,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     if (insights.isEmpty) return const SizedBox.shrink();
 
-    final userContext = ref.watch(userContextProvider);
-    final isStressed = userContext.stressLevel == UserStressLevel.high;
+    // OPTIMIZATION: Use select to watch only stressLevel instead of entire userContext
+    // Prevents unnecessary rebuilds on motion/time updates
+    final isStressed = ref.watch(
+      userContextProvider.select((ctx) => ctx.stressLevel == UserStressLevel.high),
+    );
 
     final bool isDark = Theme.of(context).brightness == Brightness.dark;
     return Column(
@@ -458,8 +461,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget _buildGreetingHeader(
       BuildContext context, int thisWeekCount, int habitCount) {
     final hour = DateTime.now().hour;
-    final userContext = ref.watch(userContextProvider);
-    final isStressed = userContext.stressLevel == UserStressLevel.high;
+    // OPTIMIZATION: Use select to watch only stressLevel
+    final isStressed = ref.watch(
+      userContextProvider.select((ctx) => ctx.stressLevel == UserStressLevel.high),
+    );
 
     final String greeting;
     if (isStressed) {

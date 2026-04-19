@@ -40,7 +40,13 @@ class EventShareService {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           const Spacer(),
-          Text(emoji, style: const TextStyle(fontSize: 96)),
+          Text(
+            emoji,
+            style: const TextStyle(
+              fontSize: 96,
+              fontFamily: 'sans-serif',
+            ),
+          ),
           const SizedBox(height: 24),
           Text(
             title,

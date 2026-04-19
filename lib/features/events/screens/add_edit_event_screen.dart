@@ -330,7 +330,14 @@ class _AddEditEventScreenState extends ConsumerState<AddEditEventScreen> {
               ),
             ),
             child: Center(
-              child: Text(_emoji, style: const TextStyle(fontSize: 28)),
+              child: Text(
+                _emoji,
+                style: TextStyle(
+                  fontSize: 28,
+                  fontFamily: 'sans-serif',
+                  color: scheme.brightness == Brightness.dark ? Colors.white : Colors.black87,
+                ),
+              ),
             ),
           ),
           suffixIcon: _titleController.text.isNotEmpty
@@ -410,15 +417,25 @@ class _AddEditEventScreenState extends ConsumerState<AddEditEventScreen> {
                       duration: const Duration(milliseconds: 300),
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.5),
+                        color: scheme.brightness == Brightness.dark
+                            ? Colors.black.withValues(alpha: 0.2)
+                            : Colors.white.withValues(alpha: 0.5),
                         borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: accent.withValues(alpha: 0.2),
+                          width: 1,
+                        ),
                       ),
                       child: AnimatedSwitcher(
                         duration: const Duration(milliseconds: 200),
                         child: Text(
                           s.emoji,
                           key: ValueKey<String>(s.emoji),
-                          style: const TextStyle(fontSize: 24),
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontFamily: 'sans-serif',
+                            color: scheme.brightness == Brightness.dark ? Colors.white : Colors.black87,
+                          ),
                         ),
                       ),
                     ),
@@ -1024,7 +1041,13 @@ class _AddEditEventScreenState extends ConsumerState<AddEditEventScreen> {
                         children: <Widget>[
                           Text(
                             r.emoji,
-                            style: const TextStyle(fontSize: 18),
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontFamily: 'sans-serif',
+                              color: selected
+                                  ? scheme.primary
+                                  : scheme.onSurface.withValues(alpha: 0.6),
+                            ),
                           ),
                           const SizedBox(height: 4),
                           Text(
@@ -1608,7 +1631,18 @@ class _AddEditEventScreenState extends ConsumerState<AddEditEventScreen> {
                           ),
                         ),
                         child: Center(
-                          child: Text(e, style: const TextStyle(fontSize: 26)),
+                          child: Text(
+                            e,
+                            style: TextStyle(
+                              fontSize: 26,
+                              fontFamily: 'sans-serif',
+                              color: selected
+                                  ? (ThemeData.estimateBrightnessForColor(Color(_color)) == Brightness.dark
+                                      ? Colors.white
+                                      : Colors.black87)
+                                  : scheme.onSurface.withValues(alpha: 0.7),
+                            ),
+                          ),
                         ),
                       ),
                     );
@@ -1948,7 +1982,20 @@ class _EmojiChip extends StatelessWidget {
           ),
         ),
         child: Center(
-          child: Text(emoji, style: const TextStyle(fontSize: 20)),
+          child: Text(
+            emoji,
+            style: TextStyle(
+              fontSize: 20,
+              fontFamily: 'sans-serif',
+              color: selected
+                  ? (ThemeData.estimateBrightnessForColor(accent) == Brightness.dark
+                      ? Colors.white
+                      : Colors.black87)
+                  : (Theme.of(context).brightness == Brightness.dark
+                      ? Colors.white70
+                      : Colors.black54),
+            ),
+          ),
         ),
       ),
     );

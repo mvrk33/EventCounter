@@ -34,7 +34,16 @@ class EventCard extends StatelessWidget {
           onTap: onTap,
           leading: CircleAvatar(
             backgroundColor: Color(event.color),
-            child: Text(event.emoji),
+            child: Text(
+              event.emoji,
+              style: TextStyle(
+                fontFamily: 'sans-serif',
+                color: ThemeData.estimateBrightnessForColor(Color(event.color)) ==
+                        Brightness.light
+                    ? Colors.black
+                    : Colors.white,
+              ),
+            ),
           ),
           title: Text(event.title),
           subtitle: Text('${_dateFormat.format(event.date)} • ${event.category}'),

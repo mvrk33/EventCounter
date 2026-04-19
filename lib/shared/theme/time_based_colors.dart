@@ -104,17 +104,18 @@ double getAdaptiveColorIntensity(UserContext context) {
 
 /// Get blur intensity based on stress and time of day
 double getAdaptiveBlurIntensity(UserContext context) {
-  final baseBlur = 15.0;
+  // REDUCED: Lowered base blur from 15.0 to 10.0 for significant performance gain
+  final baseBlur = 10.0;
 
   // Increase blur under stress
   final stressMultiplier = context.stressLevel == UserStressLevel.high
-      ? 1.4
+      ? 1.3 // Reduced from 1.4
       : context.stressLevel == UserStressLevel.medium
-          ? 1.15
+          ? 1.1 // Reduced from 1.15
           : 1.0;
 
   // Increase blur at night for eye comfort
-  final timeMultiplier = context.timePeriod == TimePeriod.night ? 1.2 : 1.0;
+  final timeMultiplier = context.timePeriod == TimePeriod.night ? 1.15 : 1.0; // Reduced from 1.2
 
   return baseBlur * stressMultiplier * timeMultiplier;
 }

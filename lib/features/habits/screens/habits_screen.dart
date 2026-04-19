@@ -161,7 +161,7 @@ class HabitsScreen extends ConsumerWidget {
                                   color: Colors.orange.withValues(alpha: 0.14),
                                 ),
                               ),
-                              const Text('🔥', style: TextStyle(fontSize: 40)),
+                              const Text('🔥', style: TextStyle(fontSize: 40, fontFamily: 'sans-serif')),
                             ],
                           ),
                         ),
@@ -412,8 +412,14 @@ class _HabitCard extends ConsumerWidget {
                       ],
                     ),
                     child: Center(
-                      child:
-                          Text(habit.emoji, style: const TextStyle(fontSize: 28)),
+                      child: Text(
+                        habit.emoji,
+                        style: TextStyle(
+                          fontSize: 28,
+                          fontFamily: 'sans-serif',
+                          color: isDark ? Colors.black87 : Colors.black,
+                        ),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 16),
@@ -575,7 +581,7 @@ class _StreakBadge extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          Text(icon, style: const TextStyle(fontSize: 10)),
+          Text(icon, style: const TextStyle(fontSize: 10, fontFamily: 'sans-serif')),
           const SizedBox(width: 4),
           Text(
             label,
@@ -619,7 +625,7 @@ class _HabitSummaryBadge extends StatelessWidget {
             shape: BoxShape.circle,
           ),
           child: Center(
-            child: Text(icon, style: const TextStyle(fontSize: 22)),
+            child: Text(icon, style: const TextStyle(fontSize: 22, fontFamily: 'sans-serif')),
           ),
         ),
         const SizedBox(width: 12),

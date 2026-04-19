@@ -176,6 +176,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                                             fontSize: user?.displayName?.isNotEmpty == true ? 24 : 26,
                                             fontWeight: FontWeight.bold,
                                             color: scheme.onPrimaryContainer,
+                                            fontFamily: 'sans-serif',
                                           ),
                                         )
                                       : null,
