@@ -37,7 +37,6 @@ class EventCard extends StatelessWidget {
             child: Text(
               event.emoji,
               style: TextStyle(
-                fontFamily: 'sans-serif',
                 color: ThemeData.estimateBrightnessForColor(Color(event.color)) ==
                         Brightness.light
                     ? Colors.black

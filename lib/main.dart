@@ -40,6 +40,7 @@ Future<void> main() async {
       try {
         final NotificationService notifications = NotificationService();
         await notifications.initialize();
+        await notifications.requestPermissionsOnFirstLaunch();
         await notifications.scheduleTodayEventsNotification();
         if (Hive.isBoxOpen(HiveBoxes.events)) {
           final List<EventModel> existingEvents =

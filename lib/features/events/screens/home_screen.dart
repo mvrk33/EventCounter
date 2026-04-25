@@ -21,11 +21,17 @@ import '../../notifications/screens/notifications_screen.dart';
 import '../../settings/screens/settings_screen.dart';
 import '../models/event_model.dart';
 import '../providers/events_provider.dart';
+import '../providers/filtered_events_provider.dart';
 import '../services/event_share_service.dart';
 import '../services/home_widget_service.dart';
 import '../widgets/event_card_polished.dart';
 import '../widgets/event_detail_modal.dart';
 import 'add_edit_event_screen.dart';
+
+final StateProvider<BoardViewMode> boardViewProvider =
+    StateProvider<BoardViewMode>((Ref ref) => BoardViewMode.list);
+
+enum BoardViewMode { list, grid }
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -36,6 +42,7 @@ class HomeScreen extends ConsumerStatefulWidget {
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   static const String _homeCardViewSettingKey = 'home_card_view_v1';
+  static const String _boardViewModeSettingKey = 'board_view_mode_v1';
 
   int _navIndex = 0;
   late final PageController _pageController;
@@ -44,29 +51,42 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   final TextEditingController _searchController = TextEditingController();
   Timer? _searchDebounce;
 
-  String _searchQuery = '';
-  String _selectedCategory = 'All';
-  _EventSort _sort = _EventSort.nearest;
-  _HomeCardView _cardView = _HomeCardView.comfortable;
   bool _filtersExpanded = false;
-
-  List<EventModel>? _cachedVisibleEvents;
-  List<EventModel>? _cachedSourceEvents;
-  String _cachedSearchQuery = '';
-  String _cachedSelectedCategory = 'All';
-  _EventSort _cachedSort = _EventSort.nearest;
-
   bool _isSyncing = false;
+  _HomeCardView _cardView = _HomeCardView.comfortable;
 
   @override
   void initState() {
     super.initState();
     _pageController = PageController(initialPage: _tabIndexFromNav(_navIndex));
-    _cardView = _readPersistedCardView();
-    // Trigger a cloud restore after the home screen appears so events stored
-    // in Firestore are pulled down even if the user skipped RestoreDataScreen
-    // or auto-restore was previously disabled.
-    WidgetsBinding.instance.addPostFrameCallback((_) => _initialCloudSync());
+    
+    // Initialize persisted settings
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadSettings();
+      _initialCloudSync();
+    });
+  }
+
+  void _loadSettings() {
+    if (!Hive.isBoxOpen(HiveBoxes.settings)) return;
+    final box = Hive.box<dynamic>(HiveBoxes.settings);
+    
+    // Card View
+    final String? rawCardView = box.get(_homeCardViewSettingKey) as String?;
+    if (rawCardView != null) {
+      for (final view in _HomeCardView.values) {
+        if (view.name == rawCardView) {
+          setState(() => _cardView = view);
+          break;
+        }
+      }
+    }
+
+    // Board View Mode
+    final String? rawBoardMode = box.get(_boardViewModeSettingKey) as String?;
+    if (rawBoardMode == BoardViewMode.grid.name) {
+      ref.read(boardViewProvider.notifier).state = BoardViewMode.grid;
+    }
   }
 
   Future<void> _initialCloudSync() async {
@@ -161,27 +181,29 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   Widget _eventsTab(BuildContext context) {
     final events = ref.watch(eventsProvider);
+    final visibleEvents = ref.watch(filteredEventsProvider);
     final habits = ref.watch(habitsProvider);
-    final userContext = ref.watch(userContextProvider);
-    final isStressed = userContext.stressLevel == UserStressLevel.high;
-    
-    final List<EventModel> visibleEvents = _buildVisibleEvents(events);
+    final viewMode = ref.watch(boardViewProvider);
+    final filters = ref.watch(eventFiltersProvider);
 
-    // Count how many events are happening this week
-    final DateTime now = DateTime.now();
-    final DateTime today = DateTime(now.year, now.month, now.day);
+    // PERFORMANCE OPTIMIZATION: Use select for stress level
+    final isStressed = ref.watch(userContextProvider.select((ctx) => ctx.stressLevel == UserStressLevel.high));
+
+    // Summary data for header
     final int thisWeekCount = events.where((e) {
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
       final d = DateTime(e.nextOccurrenceDate.year, e.nextOccurrenceDate.month, e.nextOccurrenceDate.day);
       return d.difference(today).inDays <= 7 && !d.isBefore(today);
     }).length;
 
-    // Find "next up" event — the nearest upcoming event
     EventModel? nextUpEvent;
-    {
+    if (events.isNotEmpty) {
       final upcoming = events.where((e) {
-        final d = DateTime(e.nextOccurrenceDate.year, e.nextOccurrenceDate.month, e.nextOccurrenceDate.day);
-        return !d.isBefore(today);
-      }).toList(growable: false);
+        final now = DateTime.now();
+        final today = DateTime(now.year, now.month, now.day);
+        return !DateTime(e.nextOccurrenceDate.year, e.nextOccurrenceDate.month, e.nextOccurrenceDate.day).isBefore(today);
+      }).toList();
       if (upcoming.isNotEmpty) {
         upcoming.sort((a, b) => a.nextOccurrenceDate.compareTo(b.nextOccurrenceDate));
         nextUpEvent = upcoming.first;
@@ -196,38 +218,48 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         await sync.syncAll(messenger: messenger);
       },
       child: CustomScrollView(
+        physics: const BouncingScrollPhysics(),
         slivers: <Widget>[
-          // ── Greeting header ──────────────────────────────────────────
+          // ── New Hero Header with Modern Design ──────────────────────
           SliverToBoxAdapter(
-            child: _buildGreetingHeader(context, thisWeekCount, habits.length),
+            child: RepaintBoundary(
+              child: _buildModernHeroHeader(context, thisWeekCount, habits.length, nextUpEvent, events.length),
+            ),
           ),
-          // ── Insight Dashboard (Replaces "Next Up" spotlight) ──────────
-          if (_searchQuery.isEmpty && _selectedCategory == 'All' && !isStressed)
+
+          // ── Dashboard Insights (Conditional) ────────────────────────
+          if (filters.searchQuery.isEmpty && filters.category == 'All' && !isStressed)
             SliverToBoxAdapter(
               child: _buildInsightDashboard(context, nextUpEvent, habits),
             ),
-          // ── Cloud sync banner (shows while initial restore runs) ──────
+
+          // ── Sync Banner ─────────────────────────────────────────────
           if (_isSyncing)
             SliverToBoxAdapter(
               child: _buildSyncBanner(context),
             ),
-          // ── Search & filter bar ───────────────────────────────────────
-          SliverToBoxAdapter(
-            child: _buildSearchBar(context),
+
+          // ── Integrated Search & Tool Bar ────────────────────────────
+          SliverPersistentHeader(
+            pinned: true,
+            delegate: _SliverSearchDelegate(
+              child: _buildSearchBar(context),
+            ),
           ),
-          // ── Category chips ────────────────────────────────────────────
+
+          // ── Expandable Filter Panel ─────────────────────────────────
           SliverToBoxAdapter(
             child: AnimatedCrossFade(
-              duration: const Duration(milliseconds: 220),
+              duration: const Duration(milliseconds: 250),
               crossFadeState: _filtersExpanded
                   ? CrossFadeState.showSecond
                   : CrossFadeState.showFirst,
               firstChild: const SizedBox.shrink(),
-              secondChild: _buildFilterPanel(
-                  context, events.length, visibleEvents.length),
+              secondChild: _buildFilterPanel(context, events.length, visibleEvents.length),
             ),
           ),
-          // ── Empty states ───────────────────────────────────────────────
+
+          // ── Events Grid or List with Modern Redesign ─────────────────
           if (events.isEmpty)
             SliverFillRemaining(
               hasScrollBody: false,
@@ -238,13 +270,195 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               hasScrollBody: false,
               child: _buildEmptyState(context, isEmpty: false),
             )
-          else ...[
-            // ── Section list ───────────────────────────────────────────
-            ..._buildSectionedSlivers(context, visibleEvents),
-          ],
-          const SliverToBoxAdapter(child: SizedBox(height: 24)),
+          else if (viewMode == BoardViewMode.grid)
+            _buildModernEventsGrid(context, visibleEvents)
+          else
+            ..._buildModernSectionedSlivers(context, visibleEvents),
+
+          const SliverToBoxAdapter(child: SizedBox(height: 100)),
         ],
       ),
+    );
+  }
+
+  Widget _buildModernEventsGrid(BuildContext context, List<EventModel> events) {
+    return SliverPadding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      sliver: SliverGrid(
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          mainAxisSpacing: 14,
+          crossAxisSpacing: 14,
+          childAspectRatio: 0.8,
+        ),
+        delegate: SliverChildBuilderDelegate(
+          (context, index) => _buildModernGridEventCard(context, events[index], index),
+          childCount: events.length,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildModernGridEventCard(BuildContext context, EventModel event, int index) {
+    final scheme = Theme.of(context).colorScheme;
+    final int value = DateHelpers.eventCountValue(event);
+
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: Duration(milliseconds: 300 + (index * 50)),
+      curve: Curves.easeOut,
+      builder: (context, opacity, child) {
+        return Opacity(
+          opacity: opacity,
+          child: Transform.translate(
+            offset: Offset(0, 20 * (1 - opacity)),
+            child: child,
+          ),
+        );
+      },
+      child: GestureDetector(
+        onTap: () => _showEventDetail(context, event),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(24),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Color(event.color).withValues(alpha: 0.9),
+                Color(event.color).withValues(alpha: 0.7),
+              ],
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Color(event.color).withValues(alpha: 0.3),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Stack(
+            children: [
+              // Decorative background emoji
+              Positioned(
+                right: -15,
+                top: -15,
+                child: Text(
+                  event.emoji,
+                  style: TextStyle(
+                    fontSize: 100,
+                    color: Colors.white.withValues(alpha: 0.15),
+                  ),
+                ),
+              ),
+              // Content
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.2),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Text(
+                            event.emoji,
+                            style: const TextStyle(fontSize: 24),
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.25),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            event.category,
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white.withValues(alpha: 0.9),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const Spacer(),
+                    Text(
+                      '$value',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 42,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.white,
+                        height: 1,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      event.title,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white.withValues(alpha: 0.95),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Icon(
+                          event.mode == EventMode.countdown
+                              ? Icons.schedule_rounded
+                              : Icons.trending_up_rounded,
+                          color: Colors.white.withValues(alpha: 0.7),
+                          size: 14,
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            DateHelpers.eventCountDescription(event),
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.white.withValues(alpha: 0.7),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGridEventTile(BuildContext context, EventModel event) {
+    return EventCardPolished(
+      event: event,
+      density: EventCardDensity.grid,
+      onTap: () => _showEventDetail(context, event),
+      onShare: () => _shareEvent(event),
+      onEdit: () {
+        Navigator.of(context).push(
+          MaterialPageRoute<void>(builder: (_) => AddEditEventScreen(existing: event)),
+        );
+      },
+      onDelete: () {
+        ref.read(eventsProvider.notifier).deleteEvent(event.id);
+      },
+      onAddToHomeScreen: () => _addEventToHomeScreen(event),
     );
   }
 
@@ -458,6 +672,211 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   // Removed _buildNextUpCard as it is replaced by _buildInsightDashboard
 
+  Widget _buildModernHeroHeader(BuildContext context, int thisWeekCount, int habitCount, EventModel? nextUp, int totalEvents) {
+    final scheme = Theme.of(context).colorScheme;
+    final hour = DateTime.now().hour;
+    final isStressed = ref.watch(
+      userContextProvider.select((ctx) => ctx.stressLevel == UserStressLevel.high),
+    );
+
+    final String greeting;
+    if (isStressed) {
+      greeting = 'Breathe deep';
+    } else if (hour < 5) {
+      greeting = 'Late hours';
+    } else if (hour < 12) {
+      greeting = 'Rise & shine';
+    } else if (hour < 17) {
+      greeting = 'Keep going';
+    } else {
+      greeting = 'Wind down';
+    }
+
+    final String dayStr = DateFormat('EEEE').format(DateTime.now());
+    final String dateStr = DateFormat('MMMM d').format(DateTime.now());
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(20, 28, 20, 24),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            scheme.primaryContainer.withValues(alpha: 0.3),
+            scheme.primaryContainer.withValues(alpha: 0.1),
+          ],
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header with greeting and time
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      greeting,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: scheme.primary.withValues(alpha: 0.7),
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    ShaderMask(
+                      blendMode: BlendMode.srcIn,
+                      shaderCallback: (bounds) => LinearGradient(
+                        colors: [scheme.primary, scheme.primary.withValues(alpha: 0.7)],
+                      ).createShader(bounds),
+                      child: Text(
+                        dayStr,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 48,
+                          letterSpacing: -2,
+                          height: 1.0,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      dateStr.toUpperCase(),
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        color: scheme.onSurface.withValues(alpha: 0.4),
+                        letterSpacing: 2.0,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              _buildModernLiveClock(context),
+            ],
+          ),
+          const SizedBox(height: 24),
+          // Stats row
+          Row(
+            children: [
+              _buildStatCard(
+                context,
+                icon: Icons.event_rounded,
+                label: 'Events',
+                value: '$totalEvents',
+                color: scheme.primary,
+              ),
+              const SizedBox(width: 12),
+              _buildStatCard(
+                context,
+                icon: Icons.calendar_today_rounded,
+                label: 'This Week',
+                value: '$thisWeekCount',
+                color: scheme.tertiary,
+              ),
+              const SizedBox(width: 12),
+              _buildStatCard(
+                context,
+                icon: Icons.local_fire_department_rounded,
+                label: 'Habits',
+                value: '$habitCount',
+                color: scheme.secondary,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatCard(
+    BuildContext context, {
+    required IconData icon,
+    required String label,
+    required String value,
+    required Color color,
+  }) {
+    final scheme = Theme.of(context).colorScheme;
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: color.withValues(alpha: 0.15),
+          ),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, size: 18, color: color.withValues(alpha: 0.8)),
+            const SizedBox(height: 6),
+            Text(
+              value,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+                color: color,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                color: scheme.onSurface.withValues(alpha: 0.5),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildModernLiveClock(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: scheme.outlineVariant.withValues(alpha: 0.2),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: scheme.primary.withValues(alpha: 0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: StreamBuilder(
+        stream: Stream.periodic(const Duration(minutes: 1)),
+        builder: (context, snapshot) {
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                DateFormat('HH:mm').format(DateTime.now()),
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: scheme.primary,
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
   Widget _buildGreetingHeader(
       BuildContext context, int thisWeekCount, int habitCount) {
     final hour = DateTime.now().hour;
@@ -562,7 +981,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   Widget _buildSearchBar(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return Padding(
+    final filters = ref.watch(eventFiltersProvider);
+    final viewMode = ref.watch(boardViewProvider);
+
+    return Container(
+      color: Theme.of(context).scaffoldBackgroundColor,
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
       child: Row(
         children: <Widget>[
@@ -571,8 +994,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               decoration: BoxDecoration(
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.1),
-                    blurRadius: 20,
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 15,
                     offset: const Offset(0, 4),
                   ),
                 ],
@@ -583,27 +1006,33 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   _searchDebounce?.cancel();
                   _searchDebounce = Timer(const Duration(milliseconds: 120), () {
                     if (!mounted) return;
-                    setState(() {
-                      _searchQuery = value.trim().toLowerCase();
-                    });
+                    ref.read(eventFiltersProvider.notifier).update(
+                          (s) => s.copyWith(searchQuery: value.trim()),
+                        );
                   });
                 },
                 decoration: InputDecoration(
                   prefixIcon: Icon(Icons.search_rounded,
                       color: scheme.primary.withValues(alpha: 0.5)),
                   hintText: 'Search markers...',
-                  hintStyle: TextStyle(color: scheme.onSurface.withValues(alpha: 0.3)),
+                  hintStyle: TextStyle(
+                      color: scheme.onSurface.withValues(alpha: 0.3),
+                      fontSize: 14),
                   fillColor: scheme.surfaceContainerHighest.withValues(alpha: 0.4),
                   filled: true,
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 10),
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: BorderRadius.circular(16),
                     borderSide: BorderSide.none,
                   ),
-                  suffixIcon: _searchQuery.isNotEmpty
+                  suffixIcon: filters.searchQuery.isNotEmpty
                       ? IconButton(
                           onPressed: () {
                             _searchController.clear();
-                            setState(() => _searchQuery = '');
+                            ref.read(eventFiltersProvider.notifier).update(
+                                  (s) => s.copyWith(searchQuery: ''),
+                                );
                           },
                           icon: Icon(Icons.close_rounded,
                               color: scheme.onSurface.withValues(alpha: 0.35),
@@ -614,24 +1043,30 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 8),
           _buildToolButton(
             context,
             icon: Icons.tune_rounded,
             isSelected: _filtersExpanded,
             onPressed: () => setState(() => _filtersExpanded = !_filtersExpanded),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 6),
           _buildToolButton(
             context,
-            icon: _cardView.icon,
-            isSelected: _cardView == _HomeCardView.comfortable,
+            icon: viewMode == BoardViewMode.list
+                ? Icons.grid_view_rounded
+                : Icons.view_agenda_rounded,
+            isSelected: false,
             onPressed: () {
-              _setCardView(
-                _cardView == _HomeCardView.comfortable
-                    ? _HomeCardView.compact
-                    : _HomeCardView.comfortable,
-              );
+              final newMode = viewMode == BoardViewMode.list
+                  ? BoardViewMode.grid
+                  : BoardViewMode.list;
+              ref.read(boardViewProvider.notifier).state = newMode;
+              if (Hive.isBoxOpen(HiveBoxes.settings)) {
+                Hive.box<dynamic>(HiveBoxes.settings)
+                    .put(_boardViewModeSettingKey, newMode.name);
+              }
+              HapticFeedback.lightImpact();
             },
           ),
         ],
@@ -672,106 +1107,139 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget _buildFilterPanel(
       BuildContext context, int totalCount, int visibleCount) {
     final scheme = Theme.of(context).colorScheme;
+    final filters = ref.watch(eventFiltersProvider);
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       child: Container(
         decoration: BoxDecoration(
-          color: scheme.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(18),
+          color: scheme.surfaceContainerLow.withValues(alpha: 0.5),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.1)),
         ),
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
               child: Row(
                 children:
                     <String>['All', ...AppConstants.predefinedCategories].map(
                   (String cat) {
-                    final bool selected = _selectedCategory == cat;
+                    final bool selected = filters.category == cat;
                     return Padding(
                       padding: const EdgeInsets.only(right: 8),
                       child: ChoiceChip(
                         label: Text(cat),
                         selected: selected,
                         selectedColor: scheme.primary,
-                        labelStyle: TextStyle(
+                        showCheckmark: false,
+                        labelStyle: GoogleFonts.plusJakartaSans(
+                          fontSize: 12,
                           color: selected ? scheme.onPrimary : scheme.onSurface,
                           fontWeight:
                               selected ? FontWeight.w700 : FontWeight.w500,
                         ),
                         backgroundColor: scheme.surface,
-                        onSelected: (_) =>
-                            setState(() => _selectedCategory = cat),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        onSelected: (_) {
+                          ref.read(eventFiltersProvider.notifier).update(
+                                (s) => s.copyWith(category: cat),
+                              );
+                        },
                       ),
                     );
                   },
                 ).toList(growable: false),
               ),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 16),
             Row(
               children: <Widget>[
-                Text(
-                  '$visibleCount of $totalCount events',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: scheme.onSurface.withValues(alpha: 0.5),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'SORT BY',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w900,
+                        color: scheme.onSurface.withValues(alpha: 0.4),
+                        letterSpacing: 1.0,
                       ),
+                    ),
+                    const SizedBox(height: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: scheme.surface,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.1)),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<EventSort>(
+                          value: filters.sort,
+                          isDense: true,
+                          icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 18),
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: scheme.onSurface,
+                          ),
+                          onChanged: (EventSort? value) {
+                            if (value != null) {
+                              ref.read(eventFiltersProvider.notifier).update(
+                                    (s) => s.copyWith(sort: value),
+                                  );
+                            }
+                          },
+                          items: EventSort.values
+                              .map(
+                                (EventSort s) => DropdownMenuItem<EventSort>(
+                                  value: s,
+                                  child: Text(s.label),
+                                ),
+                              )
+                              .toList(growable: false),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
                 const Spacer(),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: scheme.surface,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButton<_EventSort>(
-                      value: _sort,
-                      isDense: true,
-                      style: Theme.of(context).textTheme.labelLarge,
-                      onChanged: (_EventSort? value) {
-                        if (value != null) setState(() => _sort = value);
-                      },
-                      items: _EventSort.values
-                          .map(
-                            (_EventSort s) => DropdownMenuItem<_EventSort>(
-                              value: s,
-                              child: Text(s.label),
-                            ),
-                          )
-                          .toList(growable: false),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      'CARD STYLE',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w900,
+                        color: scheme.onSurface.withValues(alpha: 0.4),
+                        letterSpacing: 1.0,
+                      ),
                     ),
-                  ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        _ViewOptionIcon(
+                          icon: Icons.view_agenda_rounded,
+                          isSelected: _cardView == _HomeCardView.comfortable,
+                          onTap: () => _setCardView(_HomeCardView.comfortable),
+                        ),
+                        const SizedBox(width: 8),
+                        _ViewOptionIcon(
+                          icon: Icons.view_headline_rounded,
+                          isSelected: _cardView == _HomeCardView.compact,
+                          onTap: () => _setCardView(_HomeCardView.compact),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ],
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'Card view',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: scheme.onSurface.withValues(alpha: 0.6),
-                    fontWeight: FontWeight.w600,
-                  ),
-            ),
-            const SizedBox(height: 8),
-            SegmentedButton<_HomeCardView>(
-              segments: _HomeCardView.values
-                  .map(
-                    (_HomeCardView view) => ButtonSegment<_HomeCardView>(
-                      value: view,
-                      icon: Icon(view.icon, size: 18),
-                      label: Text(view.label),
-                    ),
-                  )
-                  .toList(growable: false),
-              selected: <_HomeCardView>{_cardView},
-              onSelectionChanged: (Set<_HomeCardView> selection) {
-                if (selection.isEmpty) return;
-                _setCardView(selection.first);
-              },
             ),
           ],
         ),
@@ -878,57 +1346,277 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  List<EventModel> _buildVisibleEvents(List<EventModel> events) {
-    if (identical(events, _cachedSourceEvents) &&
-        _searchQuery == _cachedSearchQuery &&
-        _selectedCategory == _cachedSelectedCategory &&
-        _sort == _cachedSort &&
-        _cachedVisibleEvents != null) {
-      return _cachedVisibleEvents!;
-    }
-
-    final List<EventModel> filtered = events.where((EventModel event) {
-      final bool categoryOk =
-          _selectedCategory == 'All' || event.category == _selectedCategory;
-      if (!categoryOk) return false;
-      if (_searchQuery.isEmpty) return true;
-      final String haystack =
-          '${event.title} ${event.notes} ${event.category}'.toLowerCase();
-      return haystack.contains(_searchQuery);
-    }).toList(growable: false);
-
-    final List<EventModel> sorted = <EventModel>[...filtered];
-    sorted.sort((EventModel a, EventModel b) {
-      switch (_sort) {
-        case _EventSort.pinnedFirst:
-          if (a.isPinned != b.isPinned) return a.isPinned ? -1 : 1;
-          return a.date.compareTo(b.date);
-        case _EventSort.nearest:
-          return a.date.compareTo(b.date);
-        case _EventSort.farthest:
-          return b.date.compareTo(a.date);
-        case _EventSort.recentlyUpdated:
-          return b.updatedAt.compareTo(a.updatedAt);
-        case _EventSort.titleAz:
-          return a.title.toLowerCase().compareTo(b.title.toLowerCase());
-      }
-    });
-
-    _cachedSourceEvents = events;
-    _cachedSearchQuery = _searchQuery;
-    _cachedSelectedCategory = _selectedCategory;
-    _cachedSort = _sort;
-    _cachedVisibleEvents = sorted;
-    return sorted;
-  }
-
   void _clearFilters() {
     _searchController.clear();
-    setState(() {
-      _searchQuery = '';
-      _selectedCategory = 'All';
-      _sort = _EventSort.nearest;
-    });
+    ref.read(eventFiltersProvider.notifier).state = const EventFilters();
+  }
+
+  List<Widget> _buildModernSectionedSlivers(
+      BuildContext context, List<EventModel> events) {
+    // Split events into 'Soon' (within 7 days) and 'Later'
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    final soon = events.where((e) {
+      final d = DateTime(e.nextOccurrenceDate.year, e.nextOccurrenceDate.month, e.nextOccurrenceDate.day);
+      final diff = d.difference(today).inDays;
+      return diff >= 0 && diff <= 7;
+    }).toList();
+
+    final later = events.where((e) {
+      final d = DateTime(e.nextOccurrenceDate.year, e.nextOccurrenceDate.month, e.nextOccurrenceDate.day);
+      final diff = d.difference(today).inDays;
+      return diff > 7 || diff < 0;
+    }).toList();
+
+    return <Widget>[
+      if (soon.isNotEmpty) ...[
+        _buildModernSectionHeader(context, '⏰ COMING SOON', soon.length),
+        _buildModernEventList(context, soon),
+      ],
+      if (later.isNotEmpty) ...[
+        _buildModernSectionHeader(context, '📅 UPCOMING EVENTS', later.length),
+        _buildModernEventList(context, later),
+      ],
+    ];
+  }
+
+  Widget _buildModernSectionHeader(BuildContext context, String title, int count) {
+    final scheme = Theme.of(context).colorScheme;
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 28, 20, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  title,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                    color: scheme.onSurface.withValues(alpha: 0.7),
+                    letterSpacing: 1.2,
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: scheme.primary.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '$count items',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: scheme.primary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 2),
+            Container(
+              height: 3,
+              width: 40,
+              decoration: BoxDecoration(
+                color: scheme.primary,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildModernEventList(BuildContext context, List<EventModel> events) {
+    return SliverList(
+      delegate: SliverChildBuilderDelegate(
+        (BuildContext context, int index) =>
+            _buildModernEventTile(context, events[index], index),
+        childCount: events.length,
+      ),
+    );
+  }
+
+  Widget _buildModernEventTile(BuildContext context, EventModel event, int index) {
+    final scheme = Theme.of(context).colorScheme;
+    final int value = DateHelpers.eventCountValue(event);
+    final breakdown = DateHelpers.breakdownBetween(
+      event.mode == EventMode.countdown ? DateTime.now() : event.date,
+      event.mode == EventMode.countdown ? event.date : DateTime.now(),
+    );
+
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: Duration(milliseconds: 300 + (index * 40)),
+      curve: Curves.easeOut,
+      builder: (context, opacity, child) {
+        return Opacity(
+          opacity: opacity,
+          child: Transform.translate(
+            offset: Offset(-20 * (1 - opacity), 0),
+            child: child,
+          ),
+        );
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        child: GestureDetector(
+          onTap: () => _showEventDetail(context, event),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              color: scheme.surfaceContainerLow,
+              border: Border.all(
+                color: scheme.outlineVariant.withValues(alpha: 0.15),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.03),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                // Emoji badge
+                Container(
+                  width: 60,
+                  height: 60,
+                  decoration: BoxDecoration(
+                    color: Color(event.color).withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Center(
+                    child: Text(
+                      event.emoji,
+                      style: const TextStyle(fontSize: 32),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                // Event info
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              event.title,
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: scheme.onSurface,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Color(event.color).withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              event.category,
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: Color(event.color),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Icon(
+                            event.mode == EventMode.countdown
+                                ? Icons.schedule_rounded
+                                : Icons.trending_up_rounded,
+                            size: 14,
+                            color: scheme.onSurface.withValues(alpha: 0.5),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            DateHelpers.eventCountDescription(event),
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              color: scheme.onSurface.withValues(alpha: 0.5),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                // Counter badge
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Color(event.color).withValues(alpha: 0.8),
+                        Color(event.color).withValues(alpha: 0.6),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        '$value',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white,
+                          height: 1,
+                        ),
+                      ),
+                      Text(
+                        _getCountUnit(event),
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white.withValues(alpha: 0.8),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _getCountUnit(EventModel event) {
+    if (event.mode == EventMode.countdown) {
+      return 'days';
+    } else {
+      final days = DateHelpers.daysBetween(event.date, DateTime.now());
+      if (days > 365) return 'years';
+      if (days > 30) return 'months';
+      return 'days';
+    }
   }
 
   List<Widget> _buildSectionedSlivers(
@@ -1086,23 +1774,64 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           .put(_homeCardViewSettingKey, view.name);
     }
   }
-
-  _HomeCardView _readPersistedCardView() {
-    if (!Hive.isBoxOpen(HiveBoxes.settings)) {
-      return _HomeCardView.comfortable;
-    }
-    final String? raw = Hive.box<dynamic>(HiveBoxes.settings)
-        .get(_homeCardViewSettingKey) as String?;
-    for (final _HomeCardView item in _HomeCardView.values) {
-      if (item.name == raw) {
-        return item;
-      }
-    }
-    return _HomeCardView.comfortable;
-  }
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
+
+class _SliverSearchDelegate extends SliverPersistentHeaderDelegate {
+  _SliverSearchDelegate({required this.child});
+  final Widget child;
+
+  @override
+  double get minExtent => 74;
+  @override
+  double get maxExtent => 74;
+
+  @override
+  Widget build(
+      BuildContext context, double shrinkOffset, bool overlapsContent) {
+    return child;
+  }
+
+  @override
+  bool shouldRebuild(_SliverSearchDelegate oldDelegate) => true;
+}
+
+class _ViewOptionIcon extends StatelessWidget {
+  const _ViewOptionIcon({
+    required this.icon,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: isSelected ? scheme.primary : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isSelected ? scheme.primary : scheme.outlineVariant.withValues(alpha: 0.2),
+          ),
+        ),
+        child: Icon(
+          icon,
+          size: 18,
+          color: isSelected ? scheme.onPrimary : scheme.onSurface.withValues(alpha: 0.4),
+        ),
+      ),
+    );
+  }
+}
 
 class _DashboardInsight {
   const _DashboardInsight({
@@ -1169,17 +1898,6 @@ class _DashboardTag extends StatelessWidget {
 
 
 
-enum _EventSort {
-  pinnedFirst('Pinned First'),
-  nearest('Nearest'),
-  farthest('Farthest'),
-  recentlyUpdated('Recently Updated'),
-  titleAz('Title A–Z');
-
-  const _EventSort(this.label);
-  final String label;
-}
-
 enum _HomeCardView {
   comfortable('Comfortable', Icons.view_agenda_rounded),
   compact('Compact', Icons.view_headline_rounded);
@@ -1211,7 +1929,6 @@ class _EventWidgetConfigDialogState
   late bool _showEmoji;
   late bool _showTitle;
   late String _countUnit;
-  String _selectedSize = '2x2'; // Default to 2x2
 
   @override
   void initState() {

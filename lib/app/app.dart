@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../core/auth_service.dart';
 import '../core/pin_security_service.dart';
 import '../core/sync_service.dart';
 import '../features/auth/screens/app_lock_screen.dart';
@@ -68,13 +67,6 @@ class _EventCounterAppState extends ConsumerState<EventCounterApp>
     try {
       final SyncService sync = ref.read(syncServiceProvider);
       await sync.replayPendingSync();
-      final auth = ref.read(authServiceProvider);
-      // Always restore from cloud on launch when signed in so events are
-      // never missing after reinstall, device switch, or a "start fresh" choice.
-      // restoreAll uses updatedAt comparison so it never overwrites newer local data.
-      if (auth.isSignedIn) {
-        await sync.restoreAll();
-      }
       await ref.read(notificationServiceProvider).requestPermissionsOnFirstLaunch();
     } catch (e) {
       // Silently handle initialization errors
